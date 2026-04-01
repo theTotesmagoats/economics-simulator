@@ -20,6 +20,7 @@ class EconomicsSimulator {
         this.currentResults = null;
         this.changes = null;
         this.lastSourceNode = null;
+        this.animationToken = 0; // For canceling stale animations
         
         console.log('EconomicsSimulator initialized');
         this.init();
@@ -55,6 +56,7 @@ class EconomicsSimulator {
         const subsidySlider = document.getElementById('subsidy-level');
         const lobbyingSlider = document.getElementById('lobbying-intensity');
         const resetBtn = document.getElementById('reset-btn');
+        const explainModeCheckbox = document.getElementById('explain-mode-checkbox');
         
         console.log('Setting up event listeners...');
         
@@ -80,6 +82,7 @@ class EconomicsSimulator {
                            'Medium-High', 'High', 'Above Average', 'Very High', 'Extreme'];
             document.getElementById('lobbying-display').textContent = values[e.target.value - 1];
             console.log('Lobbying intensity changed to:', e.target.value);
+            this.lastSourceNode = 'lobbying_effort'; // Set source node for lobbying!
             this.runSimulation();
         });
         
@@ -93,18 +96,46 @@ class EconomicsSimulator {
             document.getElementById('subsidy-display').textContent = '$0';
             document.getElementById('lobbying-display').textContent = 'Medium';
             this.lastSourceNode = null;
+            
+            // Clear summary strip and chain strip
+            document.getElementById('summary-strip').classList.add('hidden');
+            document.getElementById('chain-strip').classList.add('hidden');
+            
+            // Close info panel if open
+            document.getElementById('info-panel').classList.add('hidden');
+            
             this.runSimulation();
+        });
+        
+        // Explain mode toggle
+        explainModeCheckbox.addEventListener('change', (e) => {
+            this.graph.explainMode = e.target.checked;
+            console.log('Explain mode:', e.target.checked);
         });
         
         // Close info panel
         document.getElementById('close-info').addEventListener('click', () => {
-            document.getElementById('info-panel').classList.add('hidden');
+            this.closeInfoPanel();
         });
         
-        // Node click for info panel
-        setTimeout(() => {
-            this.setupNodeClickHandler();
-        }, 1500);
+        // Escape key closes info panel
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.closeInfoPanel();
+            }
+        });
+        
+        // Click outside info panel closes it
+        document.addEventListener('click', (e) => {
+            const infoPanel = document.getElementById('info-panel');
+            if (!infoPanel.classList.contains('hidden') && !infoPanel.contains(e.target)) {
+                this.closeInfoPanel();
+            }
+        });
+    }
+    
+    closeInfoPanel() {
+        document.getElementById('info-panel').classList.add('hidden');
     }
     
     runSimulation() {
@@ -131,7 +162,7 @@ class EconomicsSimulator {
         this.updateMetrics();
         this.industryStructure.updateMetrics(this.currentResults);
         
-        // Update summary text and tradeoff panel
+        // Update summary text, chain strip, and tradeoff panel
         this.updateSummaryAndTradeoffs(tariffRate, subsidyLevel, lobbyingIntensity);
     }
     
@@ -186,8 +217,27 @@ class EconomicsSimulator {
             document.getElementById('summary-strip').classList.add('hidden');
         }
         
-        // Update tradeoff snapshot
+        // Update active chain strip
+        this.updateChainStrip();
+        
+        // Update tradeoff snapshot and group impacts
         this.updateTradeoffSnapshot(r, c);
+    }
+    
+    updateChainStrip() {
+        const teachingPaths = {
+            tariff: ['Tariff', 'Import Price ↑', 'Domestic Price ↑', 'Demand ↓', 'Imports ↓', 'Rents ↑', 'Lobbying ↑'],
+            subsidy: ['Subsidy', 'Producer Price ↑', 'Production ↑', 'Surplus ↑', 'Rents ↑', 'Lobbying ↑'],
+            lobbying_effort: ['Lobbying Intensity', 'Political Influence ↑', 'DWL ↑']
+        };
+        
+        const path = teachingPaths[this.lastSourceNode];
+        if (path && path.length > 0) {
+            document.getElementById('chain-path').textContent = path.join(' → ');
+            document.getElementById('chain-strip').classList.remove('hidden');
+        } else {
+            document.getElementById('chain-strip').classList.add('hidden');
+        }
     }
     
     updateTradeoffSnapshot(results, changes) {
@@ -219,31 +269,53 @@ class EconomicsSimulator {
         } else {
             document.getElementById('delayed-risk').textContent = '—';
         }
+        
+        // Group impacts
+        this.updateGroupImpacts(results);
     }
     
-    setupNodeClickHandler() {
-        console.log('Setting up node click handlers...');
-        const nodeElements = document.querySelectorAll('.node');
-        console.log('Found', nodeElements.length, 'node elements');
+    updateGroupImpacts(results) {
+        const tariffRate = parseFloat(document.getElementById('tariff-rate').value);
+        const subsidyLevel = parseFloat(document.getElementById('subsidy-level').value);
         
-        nodeElements.forEach((element) => {
-            element.style.cursor = 'pointer';
-            element.addEventListener('click', (e) => {
-                e.stopPropagation();
-                // Get node ID from transform attribute or data
-                const transform = element.getAttribute('transform');
-                if (transform) {
-                    // Find corresponding node in nodeData
-                    const match = this.graph.nodeData.find(n => 
-                        Math.abs(n.x - parseFloat(transform.match(/translate\(([^,]+)/)[1])) < 1 &&
-                        Math.abs(n.y - parseFloat(transform.match(/,([^)]+)/)[1])) < 1
-                    );
-                    if (match) {
-                        this.showNodeInfo(match.id);
-                    }
-                }
-            });
-        });
+        // Household impact
+        if (results.domestic_price > this.baselineResults.domestic_price + 1) {
+            document.getElementById('household-impact').textContent = 'Purchasing power weakened';
+            document.getElementById('household-impact').className = 'group-value negative';
+        } else {
+            document.getElementById('household-impact').textContent = '—';
+            document.getElementById('household-impact').className = 'group-value';
+        }
+        
+        // Small business impact
+        if (results.moat_pressure > 0.4) {
+            document.getElementById('smallbiz-impact').textContent = 'Input pressure rose; moat widened';
+            document.getElementById('smallbiz-impact').className = 'group-value negative';
+        } else if (subsidyLevel > 0 && results.domestic_supply > this.baselineResults.domestic_supply) {
+            document.getElementById('smallbiz-impact').textContent = 'Production incentives improved';
+            document.getElementById('smallbiz-impact').className = 'group-value positive';
+        } else {
+            document.getElementById('smallbiz-impact').textContent = '—';
+            document.getElementById('smallbiz-impact').className = 'group-value';
+        }
+        
+        // Incumbent impact
+        if (results.economic_rent > 0 || results.producer_surplus > this.baselineResults.producer_surplus + 10) {
+            document.getElementById('incumbent-impact').textContent = 'Protected margins improved';
+            document.getElementById('incumbent-impact').className = 'group-value positive';
+        } else {
+            document.getElementById('incumbent-impact').textContent = '—';
+            document.getElementById('incumbent-impact').className = 'group-value';
+        }
+        
+        // Future entrant impact
+        if (results.moat_pressure > 0.3) {
+            document.getElementById('entrant-impact').textContent = 'Path to entry narrowed';
+            document.getElementById('entrant-impact').className = 'group-value negative';
+        } else {
+            document.getElementById('entrant-impact').textContent = '—';
+            document.getElementById('entrant-impact').className = 'group-value';
+        }
     }
     
     showNodeInfo(nodeId) {
@@ -285,7 +357,7 @@ class EconomicsSimulator {
         
         // Add context about what this represents
         if (nodeId === 'economic_rent') {
-            explanation += '<br><br><em>This is the "prize" that motivates rent-seeking. Protected producers earn above-market profits, which incentivizes them to spend resources lobbying to maintain protection.</em>';
+            explanation += '<br><br><em>This is the \"prize\" that motivates rent-seeking. Protected producers earn above-market profits, which incentivizes them to spend resources lobbying to maintain protection.</em>';
         } else if (nodeId === 'lobbying_effort') {
             explanation += '<br><br><em>Resources spent on lobbying are wasted from society\'s perspective — they produce nothing but serve only to capture or defend rents. This is pure deadweight loss.</em>';
         } else if (nodeId === 'political_influence') {
