@@ -90,6 +90,75 @@ header .subtitle {
     line-height: 1.5;
 }
 
+/* Chain Strip - shows active causal path */
+.chain-strip {
+    background: rgba(102, 126, 234, 0.1);
+    border-bottom: 1px solid rgba(102, 126, 234, 0.3);
+    padding: 0.75rem 2rem;
+    font-size: 0.85rem;
+}
+
+.chain-strip.hidden {
+    display: none;
+}
+
+#chain-label {
+    color: #667eea;
+    font-weight: bold;
+    margin-right: 0.5rem;
+}
+
+#chain-path {
+    color: #e2e8f0;
+}
+
+/* Teaching Mode Toggle */
+.teaching-mode-toggle {
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid #333;
+    padding: 0.65rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.teaching-mode-toggle label {
+    font-size: 0.85rem;
+    color: #e2e8f0;
+    cursor: pointer;
+}
+
+.teaching-mode-toggle input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #667eea;
+    cursor: pointer;
+}
+
+.mode-description {
+    font-size: 0.8rem;
+    color: #888;
+}
+
+/* Callout Bubble */
+#callout-bubble {
+    position: fixed;
+    background: rgba(26, 33, 62, 0.95);
+    border: 1px solid #667eea;
+    border-radius: 8px;
+    padding: 0.65rem 1rem;
+    font-size: 0.85rem;
+    color: #e2e8f0;
+    z-index: 1000;
+    pointer-events: none;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    max-width: 250px;
+}
+
+#callout-bubble.hidden {
+    display: none;
+}
+
 #app {
     display: grid;
     grid-template-columns: 300px 1fr 320px;
@@ -162,6 +231,35 @@ aside h2 {
 
 .legend-ring.up { border-color: #22c55e; }
 .legend-ring.down { border-color: #ef4444; }
+
+/* Legend edge indicators */
+.legend-edge {
+    width: 20px;
+    height: 3px;
+    margin-right: 0.5rem;
+    position: relative;
+}
+
+.legend-edge::after {
+    content: '';
+    position: absolute;
+    right: -4px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-left: 6px solid currentColor;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+}
+
+.legend-edge.positive {
+    background: #22c55e;
+    color: #22c55e;
+}
+
+.legend-edge.negative {
+    background: #ef4444;
+    color: #ef4444;
+}
 
 .legend-divider {
     height: 1px;
@@ -277,6 +375,53 @@ aside h2 {
     color: #ef4444;
 }
 
+/* Group Impact Panel */
+#group-impact-panel {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+#group-impact-panel h3 {
+    font-size: 0.85rem;
+    color: #667eea;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 0.75rem;
+}
+
+.group-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.group-item:last-child {
+    border-bottom: none;
+}
+
+.group-label {
+    font-size: 0.75rem;
+    color: #888;
+}
+
+.group-value {
+    font-size: 0.8rem;
+    font-weight: bold;
+    color: #e2e8f0;
+}
+
+.group-value.positive {
+    color: #4ade80;
+}
+
+.group-value.negative {
+    color: #ef4444;
+}
+
 main {
     background: #16213e;
     border-radius: 12px;
@@ -337,6 +482,25 @@ main {
     background: rgba(0, 0, 0, 0.15);
     border-radius: 6px;
     margin-bottom: 1rem;
+}
+
+/* Industry Status Summary */
+#industry-status {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+}
+
+.status-item {
+    font-size: 0.75rem;
+    color: #aaa;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 0.4rem 0.65rem;
+    border-radius: 4px;
+    flex: 1;
+    min-width: 120px;
 }
 
 /* Industry Metrics */
