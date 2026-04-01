@@ -39,8 +39,54 @@
         </aside>
         
         <main id="visualization">
-            <svg id="graph-container"></svg>
+            <!-- Causal Graph Panel -->
+            <div id="causal-panel">
+                <h3>Causal Mechanism</h3>
+                <svg id="graph-container"></svg>
+            </div>
             
+            <!-- Industry Structure Panel -->
+            <div id="industry-panel">
+                <h3>Industry Structure</h3>
+                <p class="panel-description">How protection affects who survives in the market</p>
+                <svg id="industry-container"></svg>
+                
+                <div id="industry-metrics">
+                    <div class="mini-metric">
+                        <span class="mini-label">Moat Pressure</span>
+                        <div class="mini-bar-container">
+                            <div id="moat-bar" class="mini-bar"></div>
+                        </div>
+                        <span id="moat-value" class="mini-value">0%</span>
+                    </div>
+                    
+                    <div class="mini-metric">
+                        <span class="mini-label">Market Concentration</span>
+                        <div class="mini-bar-container">
+                            <div id="concentration-bar" class="mini-bar warning"></div>
+                        </div>
+                        <span id="concentration-value" class="mini-value">0%</span>
+                    </div>
+                    
+                    <div class="mini-metric">
+                        <span class="mini-label">Small Biz Survival</span>
+                        <div class="mini-bar-container">
+                            <div id="survival-bar" class="mini-bar positive"></div>
+                        </div>
+                        <span id="survival-value" class="mini-value">100%</span>
+                    </div>
+                    
+                    <div class="mini-metric">
+                        <span class="mini-label">Entrant Viability</span>
+                        <div class="mini-bar-container">
+                            <div id="entrant-bar" class="mini-bar positive"></div>
+                        </div>
+                        <span id="entrant-value" class="mini-value">100%</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Info Panel -->
             <div id="info-panel" class="hidden">
                 <h3 id="node-title"></h3>
                 <p id="node-value"></p>
@@ -89,6 +135,7 @@
     <script src="js/model.js"></script>
     <script src="js/simulation.js"></script>
     <script src="js/graph.js"></script>
+    <script src="js/industry-structure.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>
