@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Economics Simulator | Protectionism & Rent-Seeking</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <header>
+        <h1>Economics Simulator</h1>
+        <p class="subtitle">Chicago School Framework • Protectionism & Rent-Seeking</p>
+    </header>
+    
+    <div id="app">
+        <aside id="controls">
+            <h2>Policy Controls</h2>
+            
+            <div class="control-group">
+                <label for="tariff-rate">Import Tariff Rate</label>
+                <input type="range" id="tariff-rate" min="0" max="100" value="0" step="1">
+                <span id="tariff-display">0%</span>
+            </div>
+            
+            <div class="control-group">
+                <label for="subsidy-level">Production Subsidy ($/unit)</label>
+                <input type="range" id="subsidy-level" min="0" max="50" value="0" step="1">
+                <span id="subsidy-display">$0</span>
+            </div>
+            
+            <div class="control-group">
+                <label for="lobbying-intensity">Political Environment</label>
+                <input type="range" id="lobbying-intensity" min="1" max="10" value="5" step="1">
+                <span id="lobbying-display">Medium</span>
+            </div>
+            
+            <button id="reset-btn">Reset to Free Trade</button>
+        </aside>
+        
+        <main id="visualization">
+            <svg id="graph-container"></svg>
+            
+            <div id="info-panel" class="hidden">
+                <h3 id="node-title"></h3>
+                <p id="node-value"></p>
+                <p id="node-explanation"></p>
+                <button id="close-info">Close</button>
+            </div>
+        </main>
+        
+        <aside id="metrics">
+            <h2>Economic Metrics</h2>
+            <div class="metric-card">
+                <span class="label">Consumer Price</span>
+                <span id="consumer-price" class="value">$100</span>
+            </div>
+            <div class="metric-card">
+                <span class="label">Domestic Production</span>
+                <span id="domestic-production" class="value">50 units</span>
+            </div>
+            <div class="metric-card">
+                <span class="label">Imports</span>
+                <span id="imports" class="value">50 units</span>
+            </div>
+            <div class="metric-card">
+                <span class="label">Gov't Revenue</span>
+                <span id="gov-revenue" class="value">$0</span>
+            </div>
+            <div class="metric-card rent-seeking">
+                <span class="label">Economic Rents Created</span>
+                <span id="rents-created" class="value">$0</span>
+            </div>
+            <div class="metric-card rent-seeking">
+                <span class="label">Lobbying Expenditure</span>
+                <span id="lobbying-cost" class="value">$0</span>
+            </div>
+            <div class="metric-card negative">
+                <span class="label">Deadweight Loss</span>
+                <span id="deadweight-loss" class="value">$0</span>
+            </div>
+        </aside>
+    </div>
+    
+    <footer>
+        <p>Inspired by Milton Friedman & Thomas Sowell • Follow the incentives, trace the tradeoffs</p>
+    </footer>
+    
+    <script src="js/model.js"></script>
+    <script src="js/simulation.js"></script>
+    <script src="js/graph.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
