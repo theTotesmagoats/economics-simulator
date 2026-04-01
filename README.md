@@ -1,4 +1,4 @@
-# Economics Simulator
+# Policy Consequence Simulator
 
 ## Interactive Causal Graph for Protectionism & Rent-Seeking
 
@@ -17,19 +17,47 @@ Inspired by Milton Friedman and Thomas Sowell:
 
 ---
 
-## Features
+## How to Use
 
-### Policy Controls
+### 1. Policy Controls (Left Panel)
 - **Import Tariff Rate** (0-100%): Tax on imported goods
 - **Production Subsidy** ($/unit): Government payment to domestic producers  
-- **Political Environment**: Scales how aggressively rents are fought over
+- **Lobbying Intensity**: Scales how aggressively rents are fought over
 
-### Visual Encoding
-- 🔴 **Red nodes**: Policy interventions
-- 🔵 **Blue nodes**: Economic variables (prices, quantities, welfare)
-- 🟠 **Orange nodes**: Rent-seeking dynamics (the trap!)
+### 2. Causal Mechanism Graph (Center, Top)
+The fixed left-to-right layout shows:
+- **Column 1 (Red)**: Policy inputs you control
+- **Column 2 (Blue)**: Price/incentive variables
+- **Column 3 (Light Blue)**: Quantity responses
+- **Column 4 (Green/Orange)**: Welfare and rent creation
+- **Column 5 (Orange)**: Political feedback loops
 
-### Key Insights the Simulator Reveals
+**Visual encoding:**
+- 🔴 Red ring = value decreased
+- 🟢 Green ring = value increased
+- Number above node = percentage change
+- Click any node for detailed explanation
+
+### 3. Industry Structure Panel (Center, Bottom)
+Shows how protection affects who survives:
+- **Large blue circles** = incumbent firms
+- **Small orange circles** = small businesses/challengers
+- As moat pressure rises: incumbents grow, small firms shrink and exit
+
+### 4. Tradeoff Snapshot & Metrics (Right Panel)
+- Who wins, who loses, hidden costs
+- Key economic indicators update in real-time
+
+---
+
+## What This Simulator Teaches
+
+### The Causal Chain
+```
+Policy → Price Change → Quantity Response → Rent Creation → Lobbying → Political Influence → Future Policy Bias
+```
+
+### Key Insights
 
 1. **Tariffs raise consumer prices** — The basic point most understand
 2. **Protection creates economic rents** — Artificial profits for protected producers
@@ -37,19 +65,20 @@ Inspired by Milton Friedman and Thomas Sowell:
 4. **Lobbying builds political influence** — Which biases future policy
 5. **The feedback loop** — Protection begets more protection through politics
 6. **Total deadweight loss includes rent-seeking** — Often larger than traditional DWL triangles
+7. **Industry structure changes** — Protected markets concentrate; small firms get crowded out
 
 ---
 
-## How to Use
+## Try This Scenario
 
 1. **Start at free trade** (all sliders at zero/medium)
-2. **Increase the tariff** and watch effects propagate:
-   - Import price rises → domestic price rises
-   - Consumer demand falls, domestic production rises
-   - Economic rents are created for producers
-3. **Watch the orange nodes activate** — rent-seeking kicks in
-4. **Click any node** to see detailed explanation of what it represents and why it changed
-5. **Compare deadweight loss components** — notice how rent-seeking can dominate
+2. **Increase tariff to 40%** and watch:
+   - Green rings appear on producer-side variables
+   - Red rings appear on consumer-side variables
+   - Orange rent-seeking nodes light up
+3. **Watch the Industry Structure panel** — incumbents grow, small firms shrink
+4. **Click any glowing node** for detailed explanation
+5. **Check Tradeoff Snapshot** — see who won and who lost
 
 ---
 
@@ -57,14 +86,15 @@ Inspired by Milton Friedman and Thomas Sowell:
 
 ```
 economics-simulator/
-├── index.html          # Main entry point
+├── index.html          # Main entry point with all panels
 ├── css/
-│   └── styles.css      # Dark theme, animations
+│   └── styles.css      # Dark theme, animations, responsive layout
 ├── js/
-│   ├── model.js        # Causal graph data structure
-│   ├── simulation.js   # Chicago school economic math
-│   ├── graph.js        # D3.js visualization
-│   └── app.js          # Application logic & interactions
+│   ├── model.js        # Causal graph data structure with fixed positions
+│   ├── simulation.js   # Chicago school economic math + industry structure vars
+│   ├── graph.js        # Fixed-layout D3 visualization with delta rings
+│   ├── industry-structure.js  # Firm survival visualization
+│   └── app.js          # Application logic, summary generation
 └── README.md
 ```
 
@@ -84,9 +114,10 @@ economics-simulator/
 - Economic Rent = (Protected Price - Competitive Price) × Protected Quantity
 - This is the "prize" motivating rent-seeking
 
-**Rent-Seeking:**
-- Lobbying Effort = Rent × Efficiency × Political Environment
-- Resources wasted = lobbying effort (pure deadweight loss)
+**Industry Structure Variables:**
+- `moatPressure` = f(economic_rent, lobbying_effort, political_influence, tariff)
+- `smallBusinessSurvival` = inverse(moatPressure)
+- `concentrationIndex` = direct(moatPressure)
 
 ---
 
@@ -109,7 +140,7 @@ Then enable GitHub Pages in repository settings.
 - [ ] Dynamic time simulation showing policy lags
 - [ ] Retaliatory tariff modeling
 - [ ] Exchange rate effects
-- [ ] Export subsidies
+- [ ] Additional scenarios: rent control, price controls, minimum wage
 
 ---
 
