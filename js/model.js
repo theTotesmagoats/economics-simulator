@@ -1,5 +1,5 @@
 // Data Model for Economics Simulator
-// Defines the structure of nodes and relationships in our causal graph
+// Defines nodes with fixed positions in a causal layout
 
 class EconomicModel {
     constructor() {
@@ -9,155 +9,130 @@ class EconomicModel {
     }
     
     initializeModel() {
-        // Policy Nodes (Red)
+        // COLUMN 1: Policy Inputs (Red)
         this.addNode('tariff', 'Import Tariff', 'policy', {
-            value: 0,
-            min: 0,
-            max: 100,
-            unit: '%',
-            description: 'Tax on imported goods, expressed as percentage of world price'
+            column: 0, row: 0,
+            value: 0, min: 0, max: 100, unit: '%',
+            description: 'Tax on imported goods. Raises domestic prices and protects producers.',
+            groupImpacts: { households: 'negative', smallBusiness: 'mixed', largeFirms: 'positive', government: 'positive' }
         });
         
         this.addNode('subsidy', 'Production Subsidy', 'policy', {
-            value: 0,
-            min: 0,
-            max: 50,
-            unit: '$/unit',
-            description: 'Government payment per unit produced domestically'
+            column: 0, row: 1,
+            value: 0, min: 0, max: 50, unit: '$/unit',
+            description: 'Government payment per unit produced. Lowers effective cost for producers.',
+            groupImpacts: { households: 'negative', smallBusiness: 'mixed', largeFirms: 'positive', government: 'negative' }
         });
         
-        // Economic Nodes (Blue) - Market Variables
-        this.addNode('world_price', 'World Price', 'economic', {
-            value: 100,
-            fixed: true,
-            unit: '$',
-            description: 'International market price (exogenous, taken as given)'
+        // COLUMN 2: Price/Incentive Variables (Blue)
+        this.addNode('world_price', 'World Price', 'market', {
+            column: 1, row: 0,
+            value: 100, fixed: true, unit: '$',
+            description: 'International market price. Exogenous in small open economy.',
+            groupImpacts: {}
         });
         
-        this.addNode('import_price', 'Landed Import Price', 'economic', {
-            value: 100,
-            unit: '$',
-            formula: 'world_price × (1 + tariff/100)',
-            description: 'Price of imported goods after tariff is applied'
+        this.addNode('import_price', 'Landed Import Price', 'market', {
+            column: 1, row: 1,
+            value: 100, unit: '$',
+            formula: 'World Price × (1 + Tariff)',
+            description: 'Price of imports after tariff is applied.',
+            groupImpacts: { households: 'negative', smallBusiness: 'negative' }
         });
         
-        this.addNode('domestic_price', 'Domestic Consumer Price', 'economic', {
-            value: 100,
-            unit: '$',
-            description: 'Price consumers pay in domestic market'
+        this.addNode('domestic_price', 'Domestic Price', 'market', {
+            column: 1, row: 2,
+            value: 100, unit: '$',
+            description: 'Price consumers pay. Determined by import price or autarky equilibrium.',
+            groupImpacts: { households: 'negative', smallBusiness: 'mixed' }
         });
         
-        this.addNode('producer_price', 'Effective Producer Price', 'economic', {
-            value: 100,
-            unit: '$',
-            description: 'Price producers receive after subsidies'
+        this.addNode('producer_price', 'Producer Price', 'market', {
+            column: 1, row: 3,
+            value: 100, unit: '$',
+            description: 'Effective price producers receive after subsidies.',
+            groupImpacts: { largeFirms: 'positive', smallBusiness: 'positive' }
         });
         
-        this.addNode('consumer_demand', 'Consumer Demand', 'economic', {
-            value: 100,
-            unit: 'units',
-            formula: '200 - domestic_price',
-            description: 'Quantity consumers want to buy at given price'
+        // COLUMN 3: Quantity Variables (Blue)
+        this.addNode('consumer_demand', 'Consumer Demand', 'quantity', {
+            column: 2, row: 0,
+            value: 100, unit: 'units',
+            formula: 'Decreases as price rises',
+            description: 'Quantity consumers want to buy at the domestic price.',
+            groupImpacts: { households: 'positive' }
         });
         
-        this.addNode('domestic_supply', 'Domestic Production', 'economic', {
-            value: 50,
-            unit: 'units',
-            formula: '-50 + producer_price',
-            description: 'Quantity domestic producers supply at given price'
+        this.addNode('domestic_supply', 'Domestic Production', 'quantity', {
+            column: 2, row: 1,
+            value: 50, unit: 'units',
+            formula: 'Increases as producer price rises',
+            description: 'Quantity domestic producers supply.',
+            groupImpacts: { largeFirms: 'positive', smallBusiness: 'mixed' }
         });
         
-        this.addNode('imports', 'Imports', 'economic', {
-            value: 50,
-            unit: 'units',
-            formula: 'max(0, consumer_demand - domestic_supply)',
-            description: 'Quantity imported to meet excess demand'
+        this.addNode('imports', 'Imports', 'quantity', {
+            column: 2, row: 2,
+            value: 50, unit: 'units',
+            formula: 'Demand - Domestic Supply',
+            description: 'Quantity imported to meet excess demand.',
+            groupImpacts: { households: 'positive' }
         });
         
-        this.addNode('gov_revenue', 'Government Revenue', 'economic', {
-            value: 0,
-            unit: '$',
-            formula: 'tariff × world_price × imports / 100',
-            description: 'Tariff revenue collected by government'
+        // COLUMN 4: Welfare/Rent Variables (Blue/Orange)
+        this.addNode('consumer_surplus', 'Consumer Surplus', 'welfare', {
+            column: 3, row: 0,
+            value: 5000, unit: '$',
+            description: 'Benefit consumers receive above what they pay.',
+            groupImpacts: { households: 'positive' }
         });
         
-        this.addNode('subsidy_cost', 'Subsidy Cost', 'economic', {
-            value: 0,
-            unit: '$',
-            formula: 'subsidy × domestic_supply',
-            description: 'Total cost of production subsidies'
+        this.addNode('producer_surplus', 'Producer Surplus', 'welfare', {
+            column: 3, row: 1,
+            value: 1250, unit: '$',
+            description: 'Benefit producers receive above their costs.',
+            groupImpacts: { largeFirms: 'positive', smallBusiness: 'mixed' }
         });
         
-        this.addNode('net_gov_budget', 'Net Government Budget', 'economic', {
-            value: 0,
-            unit: '$',
-            formula: 'gov_revenue - subsidy_cost',
-            description: 'Government revenue minus subsidy expenditures'
+        this.addNode('gov_revenue', 'Gov\'t Revenue', 'welfare', {
+            column: 3, row: 2,
+            value: 0, unit: '$',
+            description: 'Tariff revenue collected by government.',
+            groupImpacts: { government: 'positive' }
         });
         
-        // Welfare Nodes
-        this.addNode('consumer_surplus', 'Consumer Surplus', 'economic', {
-            value: 5000,
-            unit: '$',
-            formula: '(200 - domestic_price)² / 2',
-            description: 'Benefit consumers receive above what they pay'
+        // Rent-seeking nodes (Orange)
+        this.addNode('economic_rent', 'Economic Rents', 'rent-seeking', {
+            column: 3, row: 3,
+            value: 0, unit: '$',
+            description: 'Artificial profits created by protection. The "prize" motivating rent-seeking.',
+            groupImpacts: { largeFirms: 'positive' }
         });
         
-        this.addNode('producer_surplus', 'Producer Surplus', 'economic', {
-            value: 1250,
-            unit: '$',
-            formula: '(producer_price - 50)² / 2',
-            description: 'Benefit producers receive above their costs'
+        this.addNode('lobbying_effort', 'Lobbying Effort', 'rent-seeking', {
+            column: 4, row: 0,
+            value: 0, unit: '$',
+            description: 'Resources spent competing for rents. Pure deadweight loss.',
+            groupImpacts: { largeFirms: 'negative' }
         });
         
-        // Rent-Seeking Nodes (Orange)
-        this.addNode('economic_rent', 'Economic Rents Created', 'rent-seeking', {
-            value: 0,
-            unit: '$',
-            description: 'Artificial profits created by protectionist policy'
+        // COLUMN 5: Political Feedback (Orange)
+        this.addNode('political_influence', 'Political Influence', 'political', {
+            column: 4, row: 1,
+            value: 50, min: 0, max: 100, unit: 'index',
+            description: 'Accumulated influence that biases future policy. Creates path dependence.',
+            groupImpacts: { largeFirms: 'positive' }
         });
         
-        this.addNode('lobbying_effort', 'Lobbying Expenditure', 'rent-seeking', {
-            value: 0,
-            unit: '$',
-            description: 'Resources spent competing for rents'
+        // Deadweight loss
+        this.addNode('total_dwl', 'Total DWL', 'welfare', {
+            column: 4, row: 2,
+            value: 0, unit: '$',
+            description: 'Total efficiency loss including rent-seeking waste.',
+            groupImpacts: { households: 'negative' }
         });
         
-        this.addNode('political_influence', 'Political Influence', 'rent-seeking', {
-            value: 50,
-            min: 0,
-            max: 100,
-            unit: 'index',
-            description: 'Accumulated influence affecting future policy'
-        });
-        
-        // Deadweight Loss Nodes
-        this.addNode('production_dwl', 'Production DWL', 'economic', {
-            value: 0,
-            unit: '$',
-            description: 'Efficiency loss from distorted production decisions'
-        });
-        
-        this.addNode('consumption_dwl', 'Consumption DWL', 'economic', {
-            value: 0,
-            unit: '$',
-            description: 'Efficiency loss from distorted consumption decisions'
-        });
-        
-        this.addNode('rent_seeking_loss', 'Rent-Seeking Loss', 'rent-seeking', {
-            value: 0,
-            unit: '$',
-            description: 'Resources wasted in political competition'
-        });
-        
-        this.addNode('total_dwl', 'Total Deadweight Loss', 'economic', {
-            value: 0,
-            unit: '$',
-            formula: 'production_dwl + consumption_dwl + rent_seeking_loss',
-            description: 'Total efficiency loss to society'
-        });
-        
-        // Define causal relationships (edges)
+        // Define causal relationships
         this.defineEdges();
     }
     
@@ -174,60 +149,51 @@ class EconomicModel {
     }
     
     defineEdges() {
-        // Policy → Direct Economic Effects
-        this.addEdge('tariff', 'import_price', 'causes', 1);
-        this.addEdge('subsidy', 'producer_price', 'causes', 1);
+        // Policy → Price effects
+        this.addEdge('tariff', 'import_price', 'increases', 1);
+        this.addEdge('subsidy', 'producer_price', 'increases', 1);
         
-        // Price Chain
+        // Price chain
         this.addEdge('world_price', 'import_price', 'determines', 1);
-        this.addEdge('import_price', 'domestic_price', 'influences', 0.8);
-        this.addEdge('tariff', 'domestic_price', 'pushes_up', 0.6);
+        this.addEdge('import_price', 'domestic_price', 'pushes_up', 0.8);
+        this.addEdge('tariff', 'domestic_price', 'increases', 0.6);
         
-        // Producer Price Effects
+        // Producer price
         this.addEdge('domestic_price', 'producer_price', 'determines_base', 1);
         this.addEdge('subsidy', 'producer_price', 'adds_to', 1);
         
-        // Supply/Demand Responses
+        // Supply/Demand responses
         this.addEdge('domestic_price', 'consumer_demand', 'reduces', -1);
         this.addEdge('producer_price', 'domestic_supply', 'increases', 1);
         
-        // Market Clearing
+        // Market clearing
         this.addEdge('consumer_demand', 'imports', 'determines_need', 1);
         this.addEdge('domestic_supply', 'imports', 'reduces_need', -1);
         
-        // Government Accounts
-        this.addEdge('tariff', 'gov_revenue', 'generates', 1);
-        this.addEdge('imports', 'gov_revenue', 'base_for', 1);
-        this.addEdge('subsidy', 'subsidy_cost', 'determines_rate', 1);
-        this.addEdge('domestic_supply', 'subsidy_cost', 'determines_base', 1);
-        
-        // Welfare Calculations
+        // Welfare calculations
         this.addEdge('domestic_price', 'consumer_surplus', 'reduces', -1);
         this.addEdge('producer_price', 'producer_surplus', 'increases', 1);
         
-        // Rent Creation (the key insight!)
+        // Government accounts
+        this.addEdge('tariff', 'gov_revenue', 'generates', 1);
+        this.addEdge('imports', 'gov_revenue', 'base_for', 1);
+        
+        // Rent creation (key insight!)
         this.addEdge('tariff', 'economic_rent', 'creates', 0.7);
         this.addEdge('subsidy', 'economic_rent', 'creates', 0.5);
         this.addEdge('domestic_supply', 'economic_rent', 'scales', 1);
         
-        // Rent-Seeking Chain
+        // Rent-seeking chain
         this.addEdge('economic_rent', 'lobbying_effort', 'motivates', 1);
         this.addEdge('lobbying_effort', 'political_influence', 'builds', 0.3);
         
-        // Political Feedback Loop (this is the trap!)
+        // Political feedback loop (the trap!)
         this.addEdge('political_influence', 'tariff', 'biases_toward', 0.2);
         this.addEdge('political_influence', 'subsidy', 'biases_toward', 0.2);
         
-        // Deadweight Loss
-        this.addEdge('domestic_price', 'production_dwl', 'creates', 1);
-        this.addEdge('domestic_supply', 'production_dwl', 'scales', 1);
-        this.addEdge('consumer_demand', 'consumption_dwl', 'reduces_from_baseline', -1);
-        this.addEdge('lobbying_effort', 'rent_seeking_loss', 'equals', 1);
-        
-        // Total DWL aggregation
-        this.addEdge('production_dwl', 'total_dwl', 'contributes', 1);
-        this.addEdge('consumption_dwl', 'total_dwl', 'contributes', 1);
-        this.addEdge('rent_seeking_loss', 'total_dwl', 'contributes', 1);
+        // Deadweight loss
+        this.addEdge('domestic_price', 'total_dwl', 'increases', 1);
+        this.addEdge('lobbying_effort', 'total_dwl', 'adds_to', 1);
     }
     
     addEdge(from, to, relationship, strength = 1) {
@@ -247,5 +213,16 @@ class EconomicModel {
             incoming: this.edges.filter(e => e.to === nodeId),
             outgoing: this.edges.filter(e => e.from === nodeId)
         };
+    }
+    
+    // Get nodes in causal order (by column)
+    getNodesByColumn() {
+        const columns = {};
+        this.getAllNodes().forEach(node => {
+            const col = node.column || 0;
+            if (!columns[col]) columns[col] = [];
+            columns[col].push(node);
+        });
+        return Object.keys(columns).sort((a, b) => a - b).map(col => columns[col]);
     }
 }
