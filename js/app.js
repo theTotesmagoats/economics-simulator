@@ -1,5 +1,5 @@
 // Main Application Logic
-// Ties together model, simulation, and visualization
+// Ties together model, simulation, causal graph, and industry structure
 
 class EconomicsSimulator {
     constructor() {
@@ -9,9 +9,12 @@ class EconomicsSimulator {
         // Get container dimensions
         const vizContainer = document.getElementById('visualization');
         const width = Math.max(600, vizContainer.clientWidth - 40);
-        const height = 700;
         
-        this.graph = new CausalGraph('graph-container', width, height);
+        // Initialize causal graph
+        this.graph = new CausalGraph('graph-container', width, 400);
+        
+        // Initialize industry structure visualization
+        this.industryStructure = new IndustryStructure('industry-container', width, 300);
         
         this.baselineResults = null;
         this.currentResults = null;
@@ -22,13 +25,16 @@ class EconomicsSimulator {
     }
     
     init() {
-        // Initialize graph with model data
+        // Initialize causal graph with model data
         const graphData = {
             nodes: this.model.getAllNodes(),
             edges: this.model.edges
         };
         console.log('Graph data:', graphData.nodes.length, 'nodes,', graphData.edges.length, 'edges');
         this.graph.init(graphData);
+        
+        // Initialize industry structure visualization
+        this.industryStructure.init();
         
         // Calculate baseline (free trade)
         this.baselineResults = this.simulation.getBaselineResults();
@@ -40,6 +46,7 @@ class EconomicsSimulator {
         
         // Initial render of metrics
         this.updateMetrics();
+        this.industryStructure.updateMetrics(this.currentResults);
     }
     
     setupEventListeners() {
@@ -49,9 +56,6 @@ class EconomicsSimulator {
         const resetBtn = document.getElementById('reset-btn');
         
         console.log('Setting up event listeners...');
-        console.log('Tariff slider:', tariffSlider);
-        console.log('Subsidy slider:', subsidySlider);
-        console.log('Lobbying slider:', lobbyingSlider);
         
         // Slider change handlers
         tariffSlider.addEventListener('input', (e) => {
@@ -91,7 +95,7 @@ class EconomicsSimulator {
         // Node click for info panel
         setTimeout(() => {
             this.setupNodeClickHandler();
-        }, 1500);  // Wait for graph to render
+        }, 1500);
     }
     
     runSimulation() {
@@ -106,13 +110,17 @@ class EconomicsSimulator {
         this.changes = this.simulation.calculateChanges(this.currentResults, this.baselineResults);
         
         console.log('Current results:', this.currentResults);
-        console.log('Changes calculated');
+        console.log('Moat pressure:', this.currentResults.moat_pressure);
         
-        // Update graph with new values
+        // Update causal graph with new values
         this.graph.updateValues(this.currentResults, this.changes);
         
-        // Update metrics panel
+        // Update industry structure visualization
+        this.industryStructure.render(this.currentResults.moat_pressure);
+        
+        // Update metrics panels
         this.updateMetrics();
+        this.industryStructure.updateMetrics(this.currentResults);
     }
     
     updateMetrics() {
@@ -144,7 +152,6 @@ class EconomicsSimulator {
     }
     
     showNodeInfo(nodeIndex) {
-        // Get node data from graph
         const nodes = this.graph.nodeData;
         if (!nodes || !nodes[nodeIndex]) {
             console.log('No node data at index', nodeIndex);
