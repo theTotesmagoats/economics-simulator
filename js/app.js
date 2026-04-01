@@ -8,7 +8,7 @@ class EconomicsSimulator {
         
         // Get container dimensions
         const vizContainer = document.getElementById('visualization');
-        const width = vizContainer.clientWidth - 40;
+        const width = Math.max(600, vizContainer.clientWidth - 40);
         const height = 700;
         
         this.graph = new CausalGraph('graph-container', width, height);
@@ -17,6 +17,7 @@ class EconomicsSimulator {
         this.currentResults = null;
         this.changes = null;
         
+        console.log('EconomicsSimulator initialized');
         this.init();
     }
     
@@ -26,17 +27,19 @@ class EconomicsSimulator {
             nodes: this.model.getAllNodes(),
             edges: this.model.edges
         };
+        console.log('Graph data:', graphData.nodes.length, 'nodes,', graphData.edges.length, 'edges');
         this.graph.init(graphData);
         
         // Calculate baseline (free trade)
         this.baselineResults = this.simulation.getBaselineResults();
         this.currentResults = { ...this.baselineResults };
+        console.log('Baseline results:', this.baselineResults);
         
         // Set up event listeners
         this.setupEventListeners();
         
-        // Initial render
-        this.updateDisplay();
+        // Initial render of metrics
+        this.updateMetrics();
     }
     
     setupEventListeners() {
@@ -45,75 +48,68 @@ class EconomicsSimulator {
         const lobbyingSlider = document.getElementById('lobbying-intensity');
         const resetBtn = document.getElementById('reset-btn');
         
+        console.log('Setting up event listeners...');
+        console.log('Tariff slider:', tariffSlider);
+        console.log('Subsidy slider:', subsidySlider);
+        console.log('Lobbying slider:', lobbyingSlider);
+        
         // Slider change handlers
         tariffSlider.addEventListener('input', (e) => {
-            this.updatePolicy('tariff', parseFloat(e.target.value));
-            document.getElementById('tariff-display').textContent = `${e.target.value}%`;
+            const value = parseFloat(e.target.value);
+            console.log('Tariff changed to:', value);
+            document.getElementById('tariff-display').textContent = `${value}%`;
+            this.runSimulation();
         });
         
         subsidySlider.addEventListener('input', (e) => {
-            this.updatePolicy('subsidy', parseFloat(e.target.value));
-            document.getElementById('subsidy-display').textContent = `$${e.target.value}`;
+            const value = parseFloat(e.target.value);
+            console.log('Subsidy changed to:', value);
+            document.getElementById('subsidy-display').textContent = `$${value}`;
+            this.runSimulation();
         });
         
         lobbyingSlider.addEventListener('input', (e) => {
             const values = ['Very Low', 'Low', 'Below Average', 'Medium-Low', 'Medium', 
                            'Medium-High', 'High', 'Above Average', 'Very High', 'Extreme'];
             document.getElementById('lobbying-display').textContent = values[e.target.value - 1];
+            console.log('Lobbying intensity changed to:', e.target.value);
             this.runSimulation();
         });
         
         // Reset button
         resetBtn.addEventListener('click', () => {
+            console.log('Reset clicked');
             tariffSlider.value = 0;
             subsidySlider.value = 0;
             lobbyingSlider.value = 5;
             document.getElementById('tariff-display').textContent = '0%';
             document.getElementById('subsidy-display').textContent = '$0';
             document.getElementById('lobbying-display').textContent = 'Medium';
-            this.updatePolicy('tariff', 0);
-            this.updatePolicy('subsidy', 0);
             this.runSimulation();
         });
         
         // Node click for info panel
-        this.setupNodeClickHandler();
-        
-        // Close info panel
-        document.getElementById('close-info').addEventListener('click', () => {
-            document.getElementById('info-panel').classList.add('hidden');
-            this.graph.resetHighlights();
-        });
-    }
-    
-    updatePolicy(type, value) {
-        const node = this.model.getNode(type);
-        if (node) {
-            node.value = value;
-        }
-        this.runSimulation();
+        setTimeout(() => {
+            this.setupNodeClickHandler();
+        }, 1500);  // Wait for graph to render
     }
     
     runSimulation() {
+        console.log('Running simulation...');
         const tariffRate = parseFloat(document.getElementById('tariff-rate').value);
         const subsidyLevel = parseFloat(document.getElementById('subsidy-level').value);
         const lobbyingIntensity = parseFloat(document.getElementById('lobbying-intensity').value);
         
+        console.log('Inputs: tariff=', tariffRate, 'subsidy=', subsidyLevel, 'lobbying=', lobbyingIntensity);
+        
         this.currentResults = this.simulation.runSimulation(tariffRate, subsidyLevel, lobbyingIntensity);
         this.changes = this.simulation.calculateChanges(this.currentResults, this.baselineResults);
         
+        console.log('Current results:', this.currentResults);
+        console.log('Changes calculated');
+        
         // Update graph with new values
         this.graph.updateValues(this.currentResults, this.changes);
-        
-        // Find affected nodes for animation
-        const affectedNodes = Object.keys(this.changes)
-            .filter(key => Math.abs(this.changes[key].changePercent) > 1)
-            .filter(key => key !== 'tariff' && key !== 'subsidy');
-        
-        // Animate propagation from policy nodes
-        if (affectedNodes.length > 0) {
-            this.graph.animatePropagation('tariff', affectedNodes);
-        }
         
         // Update metrics panel
         this.updateMetrics();
@@ -121,35 +117,44 @@ class EconomicsSimulator {
     
     updateMetrics() {
         const r = this.currentResults;
+        console.log('Updating metrics:', r);
         
         document.getElementById('consumer-price').textContent = `$${r.domestic_price.toFixed(1)}`;
-        document.getElementById('domestic-production').textContent = `${r.domestic_supply.toFixed(0)} units`;
-        document.getElementById('imports').textContent = `${r.imports.toFixed(0)} units`;
-        document.getElementById('gov-revenue').textContent = `$${r.gov_revenue.toFixed(0)}`;
-        document.getElementById('rents-created').textContent = `$${r.economic_rent.toFixed(0)}`;
-        document.getElementById('lobbying-cost').textContent = `$${r.lobbying_effort.toFixed(0)}`;
-        document.getElementById('deadweight-loss').textContent = `$${r.total_dwl.toFixed(0)}`;
+        document.getElementById('domestic-production').textContent = `${Math.round(r.domestic_supply)} units`;
+        document.getElementById('imports').textContent = `${Math.round(r.imports)} units`;
+        document.getElementById('gov-revenue').textContent = `$${Math.round(r.gov_revenue)}`;
+        document.getElementById('rents-created').textContent = `$${Math.round(r.economic_rent)}`;
+        document.getElementById('lobbying-cost').textContent = `$${Math.round(r.lobbying_effort)}`;
+        document.getElementById('deadweight-loss').textContent = `$${Math.round(r.total_dwl)}`;
     }
     
     setupNodeClickHandler() {
-        // We'll add click handlers after the graph is rendered
-        setTimeout(() => {
-            const nodeElements = document.querySelectorAll('.node');
-            nodeElements.forEach((element, index) => {
-                element.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.showNodeInfo(index);
-                });
+        console.log('Setting up node click handlers...');
+        const nodeElements = document.querySelectorAll('.node');
+        console.log('Found', nodeElements.length, 'node elements');
+        
+        nodeElements.forEach((element, index) => {
+            element.style.cursor = 'pointer';
+            element.addEventListener('click', (e) => {
+                e.stopPropagation();
+                console.log('Node clicked:', index);
+                this.showNodeInfo(index);
             });
-        }, 100);
+        });
     }
     
     showNodeInfo(nodeIndex) {
-        const nodes = this.graph.nodes.data();
-        const node = nodes[nodeIndex];
-        if (!node) return;
+        // Get node data from graph
+        const nodes = this.graph.nodeData;
+        if (!nodes || !nodes[nodeIndex]) {
+            console.log('No node data at index', nodeIndex);
+            return;
+        }
         
+        const node = nodes[nodeIndex];
         const nodeId = node.id;
+        console.log('Showing info for node:', nodeId);
+        
         const modelNode = this.model.getNode(nodeId);
         const result = this.currentResults[nodeId];
         const change = this.changes[nodeId];
@@ -177,30 +182,28 @@ class EconomicsSimulator {
         // Build explanation
         let explanation = modelNode.description || '';
         if (modelNode.formula) {
-            explanation += `\n\nFormula: ${modelNode.formula}`;
+            explanation += '<br><br>Formula: ' + modelNode.formula;
         }
         
         // Add context about what this represents
         if (nodeId === 'economic_rent') {
-            explanation += '\n\n<em>This is the "prize" that motivates rent-seeking. Protected producers earn above-market profits, which incentivizes them to spend resources lobbying to maintain protection.</em>';
+            explanation += '<br><br><em>This is the "prize" that motivates rent-seeking. Protected producers earn above-market profits, which incentivizes them to spend resources lobbying to maintain protection.</em>';
         } else if (nodeId === 'lobbying_effort') {
-            explanation += '\n\n<em>Resources spent on lobbying are wasted from society\'s perspective — they produce nothing but serve only to capture or defend rents. This is pure deadweight loss.</em>';
+            explanation += '<br><br><em>Resources spent on lobbying are wasted from society\'s perspective — they produce nothing but serve only to capture or defend rents. This is pure deadweight loss.</em>';
         } else if (nodeId === 'political_influence') {
-            explanation += '\n\n<em>The trap: influence accumulates and biases future policy, creating path dependence. Protection begets more protection through political feedback loops.</em>';
+            explanation += '<br><br><em>The trap: influence accumulates and biases future policy, creating path dependence. Protection begets more protection through political feedback loops.</em>';
         }
         
         // Update info panel
         document.getElementById('node-title').innerHTML = `${modelNode.name}${changeHtml}`;
         document.getElementById('node-value').textContent = valueStr;
-        document.getElementById('node-explanation').innerHTML = explanation.replace(/\n/g, '<br>');
+        document.getElementById('node-explanation').innerHTML = explanation;
         document.getElementById('info-panel').classList.remove('hidden');
-        
-        // Highlight node in graph
-        this.graph.highlightNode(nodeId);
     }
 }
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM loaded, initializing simulator...');
     window.simulator = new EconomicsSimulator();
 });
