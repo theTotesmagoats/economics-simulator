@@ -23,28 +23,26 @@ class CausalGraph {
         
         this.svg = null;
         this.simulation = null;
-        this.nodes = null;
-        this.links = null;
+        this.nodeElements = null;  // Store node elements for updates
+        this.linkElements = null;  // Store link elements
     }
     
     init(data) {
+        console.log('Initializing graph with', data.nodes.length, 'nodes');
+        
         // Create SVG
         this.svg = this.container.append('svg')
             .attr('width', this.width)
-            .attr('height', this.height)
-            .call(d3.zoom().on('zoom', (event) => {
-                this.g.attr('transform', event.transform);
-            }));
-        
-        // Create main group for zoomable content
-        this.g = this.svg.append('g');
+            .attr('height', this.height);
         
         // Add background
         this.svg.append('rect')
             .attr('width', this.width)
             .attr('height', this.height)
-            .attr('fill', '#16213e')
-            .attr('pointer-events', 'none');
+            .attr('fill', '#16213e');
+        
+        // Create main group
+        const g = this.svg.append('g');
         
         // Prepare node and link data
         const nodes = data.nodes.map(n => ({
@@ -64,27 +62,29 @@ class CausalGraph {
             strength: e.strength
         }));
         
-        this.render(nodes, links);
+        this.render(g, nodes, links);
     }
     
-    render(nodes, links) {
+    render(g, nodes, links) {
         // Force simulation
         this.simulation = d3.forceSimulation(nodes)
-            .force('link', d3.forceLink(links).id(d => d.id).distance(100))
-            .force('charge', d3.forceManyBody().strength(-500))
+            .force('link', d3.forceLink(links).id(d => d.id).distance(120))
+            .force('charge', d3.forceManyBody().strength(-800))
             .force('center', d3.forceCenter(this.width / 2, this.height / 2))
-            .force('collide', d3.forceCollide(d => this.nodeSizes[d.type] + 10));
+            .force('collide', d3.forceCollide(d => this.nodeSizes[d.type] + 15));
         
         // Draw links
-        this.links = this.g.append('g')
+        this.linkElements = g.append('g')
             .selectAll('.link')
             .data(links)
             .enter().append('line')
             .attr('class', 'link')
-            .attr('stroke-width', d => Math.max(1, Math.abs(d.strength) * 2));
+            .attr('stroke', '#444')
+            .attr('stroke-width', 1.5)
+            .attr('stroke-opacity', 0.5);
         
         // Draw nodes
-        this.nodes = this.g.append('g')
+        this.nodeElements = g.append('g')
             .selectAll('.node')
             .data(nodes)
             .enter().append('g')
@@ -95,120 +95,76 @@ class CausalGraph {
                 .on('end', dragended));
         
         // Node circles
-        this.nodes.append('circle')
+        this.nodeElements.append('circle')
             .attr('r', d => this.nodeSizes[d.type])
-            .attr('fill', d => this.colors[d.type]);
+            .attr('fill', d => this.colors[d.type])
+            .attr('stroke', '#fff')
+            .attr('stroke-width', 2);
         
         // Node labels
-        this.nodes.append('text')
-            .attr('dy', d => this.nodeSizes[d.type] + 15)
+        this.nodeElements.append('text')
+            .attr('dy', d => this.nodeSizes[d.type] + 18)
             .attr('text-anchor', 'middle')
-            .attr('class', 'node-label')
-            .text(d => this.truncateLabel(d.name, 15));
+            .attr('fill', '#fff')
+            .attr('font-size', '11px')
+            .attr('pointer-events', 'none')
+            .style('text-shadow', '0 0 3px #000')
+            .text(d => this.truncateLabel(d.name, 14));
+        
+        // Store node data for later access
+        this.nodeData = nodes;
         
         // Update positions on each tick
         this.simulation.on('tick', () => {
-            this.links
+            this.linkElements
                 .attr('x1', d => d.source.x)
                 .attr('y1', d => d.source.y)
                 .attr('x2', d => d.target.x)
                 .attr('y2', d => d.target.y);
             
-            this.nodes
+            this.nodeElements
                 .attr('transform', d => `translate(${d.x},${d.y})`);
         });
     }
     
     updateValues(results, changes) {
-        // Update node values and animate changes
-        this.nodes.each((nodeData, i, nodes) => {
-            const result = results[nodeData.id];
-            const change = changes[nodeData.id];
+        console.log('Updating values with results:', Object.keys(results).length, 'values');
+        
+        // Update each node's data and visual properties
+        this.nodeElements.each((nodeData, index, elements) => {
+            const nodeId = nodeData.id;
+            const result = results[nodeId];
+            const change = changes ? changes[nodeId] : null;
             
             if (result !== undefined) {
+                // Update stored values
                 nodeData.value = result;
                 nodeData.change = change ? change.change : 0;
                 nodeData.changePercent = change ? change.changePercent : 0;
                 
-                // Animate size based on magnitude of change
-                d3.select(nodes[i].querySelector('circle'))
-                    .transition()
-                    .duration(500)
-                    .attr('r', d => {
-                        const baseSize = this.nodeSizes[d.type];
-                        const scale = 1 + Math.min(0.3, Math.abs(change.changePercent) / 200);
-                        return baseSize * scale;
-                    });
-                
-                // Pulse animation for significant changes
-                if (Math.abs(change.changePercent) > 10) {
-                    d3.select(nodes[i]).classed('pulsing', true);
-                    setTimeout(() => d3.select(nodes[i]).classed('pulsing', false), 600);
-                }
+                console.log(`Node ${nodeId}: value=${result}, change=${change?.changePercent.toFixed(1)}%`);
             }
         });
-    }
-    
-    animatePropagation(sourceNodeId, affectedNodes) {
-        // Animate wave propagation from source through affected nodes
-        const sourceNode = this.nodes.find(d => d.id === sourceNodeId);
-        if (!sourceNode) return;
         
-        // Find paths from source to each affected node
-        affectedNodes.forEach((nodeId, index) => {
-            const delay = index * 150;
-            
-            setTimeout(() => {
-                const nodeElement = this.nodes.filter(d => d.id === nodeId)[0];
-                if (nodeElement) {
-                    // Pulse the node
-                    d3.select(nodeElement.querySelector('circle'))
-                        .transition()
-                        .duration(300)
-                        .attr('stroke-width', 6)
-                        .transition()
-                        .duration(300)
-                        .attr('stroke-width', 2);
-                }
-            }, delay);
-        });
-    }
-    
-    highlightNode(nodeId) {
-        // Highlight incoming and outgoing edges
-        const node = this.nodes.find(d => d.id === nodeId);
-        if (!node) return;
-        
-        // Reset all links first
-        this.links.attr('stroke-opacity', 0.6).attr('stroke-width', d => Math.max(1, Math.abs(d.strength) * 2));
-        
-        // Highlight related links
-        this.links.filter(d => d.source.id === nodeId || d.target.id === nodeId)
+        // Now update visual properties with transitions
+        this.nodeElements.select('circle')
             .transition()
-            .duration(300)
-            .attr('stroke', '#fff')
-            .attr('stroke-opacity', 1)
-            .attr('stroke-width', 3);
-        
-        // Highlight the node itself
-        this.nodes.filter(d => d.id === nodeId)
-            .transition()
-            .duration(300)
-            .select('circle')
-            .attr('stroke', '#fff')
-            .attr('stroke-width', 4);
+            .duration(400)
+            .attr('r', d => {
+                const baseSize = this.nodeSizes[d.type];
+                // Scale based on change magnitude, capped at 1.3x
+                const scale = 1 + Math.min(0.3, Math.abs(d.changePercent || 0) / 150);
+                return baseSize * scale;
+            })
+            .attr('stroke-width', d => {
+                // Thicker stroke for policy nodes or significant changes
+                if (d.type === 'policy') return 3;
+                return Math.abs(d.changePercent || 0) > 10 ? 4 : 2;
+            });
     }
     
-    resetHighlights() {
-        this.links
-            .transition().duration(300)
-            .attr('stroke-opacity', 0.6)
-            .attr('stroke-width', d => Math.max(1, Math.abs(d.strength) * 2));
-        
-        this.nodes.select('circle')
-            .transition().duration(300)
-            .attr('stroke', '#fff')
-            .attr('stroke-width', 2);
+    getNodeById(nodeId) {
+        return this.nodeData.find(d => d.id === nodeId);
     }
     
     truncateLabel(text, maxLength) {
