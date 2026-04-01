@@ -124,9 +124,95 @@ main {
     overflow: hidden;
 }
 
+/* Causal Panel */
+#causal-panel {
+    margin-bottom: 1.5rem;
+}
+
+#causal-panel h3, #industry-panel h3 {
+    color: #667eea;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 0.5rem;
+}
+
+.panel-description {
+    color: #888;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+}
+
 #graph-container {
     width: 100%;
-    height: 700px;
+    height: 400px;
+}
+
+/* Industry Panel */
+#industry-panel {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+#industry-container {
+    width: 100%;
+    height: 300px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 6px;
+    margin-bottom: 1rem;
+}
+
+/* Industry Metrics */
+#industry-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+}
+
+.mini-metric {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    padding: 0.75rem;
+}
+
+.mini-label {
+    display: block;
+    font-size: 0.75rem;
+    color: #888;
+    margin-bottom: 0.5rem;
+}
+
+.mini-bar-container {
+    width: 100%;
+    height: 6px;
+    background: #333;
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 0.25rem;
+}
+
+.mini-bar {
+    height: 100%;
+    background: #667eea;
+    transition: width 0.5s ease;
+    border-radius: 3px;
+}
+
+.mini-bar.warning {
+    background: linear-gradient(90deg, #ffa502, #ff7b00);
+}
+
+.mini-bar.positive {
+    background: linear-gradient(90deg, #4ade80, #22c55e);
+}
+
+.mini-value {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: bold;
+    color: #fff;
+    text-align: right;
 }
 
 /* Node Styles */
@@ -270,12 +356,34 @@ footer {
     animation: pulse 0.6s ease-in-out;
 }
 
-@keyframes wave {
-    0% { stroke-dashoffset: 100; }
-    100% { stroke-dashoffset: 0; }
+/* Industry structure animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.5); }
+    to { opacity: 1; transform: scale(1); }
 }
 
-.waving {
-    stroke-dasharray: 10, 5;
-    animation: wave 1s linear infinite;
+@keyframes fadeOut {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.3); }
+}
+
+@keyframes shrink {
+    from { r: var(--from-r); }
+    to { r: var(--to-r); }
+}
+
+.firm-enter {
+    animation: fadeIn 0.6s ease-out;
+}
+
+.firm-exit {
+    animation: fadeOut 0.8s ease-in forwards;
+}
+
+.firm-shrink {
+    transition: r 1s ease, opacity 1s ease;
+}
+
+.firm-grow {
+    transition: r 1s ease;
 }
