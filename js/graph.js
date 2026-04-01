@@ -71,6 +71,9 @@ class CausalGraph {
             strength: edge.strength
         })).filter(l => l.source && l.target);
         
+        // Color-code edges by relationship sign:
+        // Green = positive/direct (A↑ → B↑)
+        // Red = negative/inverse (A↑ → B↓)
         this.linkElements = this.svg.append('g').attr('class', 'links')
             .selectAll('.link')
             .data(linkData)
@@ -80,9 +83,9 @@ class CausalGraph {
             .attr('y1', d => d.source.y)
             .attr('x2', d => d.target.x)
             .attr('y2', d => d.target.y)
-            .attr('stroke', '#4a5568')
+            .attr('stroke', d => d.strength > 0 ? '#22c55e' : '#ef4444')
             .attr('stroke-width', 1.5)
-            .attr('stroke-opacity', 0.4);
+            .attr('stroke-opacity', 0.6);
         
         // Add arrow markers for direction
         this.linkElements.append('path')
@@ -94,8 +97,8 @@ class CausalGraph {
                 const angle = Math.atan2(dy, dx) * 180 / Math.PI;
                 return `translate(${d.target.x}, ${d.target.y}) rotate(${angle})`;
             })
-            .attr('fill', '#4a5568')
-            .attr('opacity', 0.4);
+            .attr('fill', d => d.strength > 0 ? '#22c55e' : '#ef4444')
+            .attr('opacity', 0.6);
         
         // Draw nodes
         this.nodeElements = this.svg.append('g').attr('class', 'nodes')
@@ -303,9 +306,9 @@ class CausalGraph {
             .attr('stroke-width', 3)
             .attr('stroke-opacity', 1)
             .transition().delay(400).duration(400)
-            .attr('stroke', '#4a5568')
+            .attr('stroke', d => d.strength > 0 ? '#22c55e' : '#ef4444')
             .attr('stroke-width', 1.5)
-            .attr('stroke-opacity', 0.4);
+            .attr('stroke-opacity', 0.6);
     }
     
     dimInactive() {
@@ -327,7 +330,7 @@ class CausalGraph {
         
         this.linkElements
             .transition().duration(300)
-            .attr('stroke-opacity', 0.4);
+            .attr('stroke-opacity', 0.6);
     }
     
     getNodeById(nodeId) {
