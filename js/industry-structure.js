@@ -26,14 +26,15 @@ class IndustryStructure {
         };
         
         this.svg = null;
-        this.firmGroups = null;
+        this.incumbentGroups = null;
+        this.smallFirmGroups = null;
         this.incumbentData = [];
         this.smallFirmData = [];
         this.currentMoatPressure = 0;
     }
     
     init() {
-        // Create SVG
+        // Create SVG inside the div container
         this.svg = this.container.append('svg')
             .attr('width', this.width)
             .attr('height', this.height);
@@ -84,6 +85,7 @@ class IndustryStructure {
                 currentRadius: this.config.smallBaseRadius,
                 marketShare: 3 + Math.random() * 2,  // Small firms have ~3% each
                 alive: true,
+                exited: false,  // Track if already animated out
                 name: `Small Biz ${i + 1}`
             };
         });
@@ -114,23 +116,32 @@ class IndustryStructure {
                 small.targetX = small.x * pushFactor;
                 small.targetY = small.y * pushFactor;
             } else {
+                if (small.alive) {
+                    small.exited = true;  // Mark for exit animation
+                }
                 small.alive = false;  // Exit the market
             }
         });
         
         // Create or update incumbent groups
-        this.updateFirms(this.incumbentData, 'incumbents');
-        this.updateFirms(this.smallFirmData.filter(f => f.alive), 'small-firms');
+        this.updateFirms(this.incumbentData, 'incumbents', this.incumbentGroups);
+        
+        // Update small firms (only alive ones)
+        const aliveSmallFirms = this.smallFirmData.filter(f => f.alive);
+        this.updateFirms(aliveSmallFirms, 'small-firms', this.smallFirmGroups);
         
         // Handle exiting firms with fade-out animation
-        const exitingFirms = this.smallFirmData.filter(f => !f.alive);
+        const exitingFirms = this.smallFirmData.filter(f => f.exited);
         if (exitingFirms.length > 0) {
             this.animateExits(exitingFirms);
+            // Clear exited flag after animating
+            exitingFirms.forEach(f => f.exited = false);
         }
     }
     
-    updateFirms(firmData, selector) {
-        const groups = this.svg.selectAll(`.${selector}`).data([], d => d.id);
+    updateFirms(firmData, selector, existingSelection) {
+        // FIX: Use firmData instead of empty array!
+        const groups = this.svg.selectAll(`.${selector}`).data(firmData, d => d.id);
         
         // Remove old firms
         groups.exit()
@@ -138,21 +149,26 @@ class IndustryStructure {
             .style('opacity', 0)
             .remove();
         
-        // Add/update firms
+        // Add/update firms - use enter/merge pattern
         const firmGroups = groups.enter()
             .append('g')
-            .attr('class', d => `${selector} ${d.type}`);
+            .attr('class', d => `${selector} ${d.type}`)
+            .attr('transform', d => `translate(${d.x}, ${d.y})`)
+            .merge(groups);
         
-        // Add circles
-        firmGroups.append('circle')
+        // Add circles (enter only)
+        groups.enter().append('circle')
             .attr('r', 0)
             .attr('fill', d => this.colors[d.type])
-            .attr('opacity', 0.85)
+            .attr('opacity', 0.85);
+        
+        // Update all circles with transitions
+        firmGroups.select('circle')
             .transition().duration(800)
             .attr('r', d => d.targetRadius || d.currentRadius);
         
-        // Add labels for incumbents
-        firmGroups.filter(d => d.type === 'incumbent')
+        // Add labels for incumbents (enter only)
+        groups.enter().filter(d => d.type === 'incumbent')
             .append('text')
             .attr('dy', d => (d.targetRadius || d.currentRadius) + 15)
             .attr('text-anchor', 'middle')
@@ -161,11 +177,16 @@ class IndustryStructure {
             .style('text-shadow', '0 0 3px #000')
             .text(d => d.name);
         
-        // Position all firms
-        firmGroups.attr('transform', d => `translate(${d.x || d.targetX}, ${d.y || d.targetY})`);
+        // Update positions with transitions
+        firmGroups.transition().duration(800)
+            .attr('transform', d => `translate(${d.targetX || d.x}, ${d.targetY || d.y})`);
         
         // Store for future updates
-        this.firmGroups = this.svg.selectAll(`.${selector}`);
+        if (selector === 'incumbents') {
+            this.incumbentGroups = firmGroups;
+        } else {
+            this.smallFirmGroups = firmGroups;
+        }
     }
     
     animateExits(exitingFirms) {
@@ -208,6 +229,39 @@ class IndustryStructure {
         // Update entrant viability
         document.getElementById('entrant-bar').style.width = `${results.entrant_viability}%`;
         document.getElementById('entrant-value').textContent = `${results.entrant_viability}%`;
+        
+        // Update industry status summary
+        this.updateIndustryStatus(results);
+    }
+    
+    updateIndustryStatus(results) {
+        const baselineSmallFirms = 15;
+        const survivingCount = results.small_firms_surviving || Math.round(baselineSmallFirms * (results.small_business_survival / 100));
+        const exitedCount = baselineSmallFirms - survivingCount;
+        
+        // Incumbent gain
+        if (results.incumbent_share_advantage > 0) {
+            document.getElementById('incumbent-gain').textContent = 
+                `3 incumbents gained +${results.incumbent_share_advantage}% protected share`;
+        } else {
+            document.getElementById('incumbent-gain').textContent = '—';
+        }
+        
+        // Challenger survival
+        if (exitedCount > 0) {
+            document.getElementById('challenger-remain').textContent = 
+                `${survivingCount} of ${baselineSmallFirms} challengers remain viable`;
+        } else {
+            document.getElementById('challenger-remain').textContent = '—';
+        }
+        
+        // Entrant viability
+        if (results.entrant_viability < 80) {
+            document.getElementById('entrant-viability').textContent = 
+                `Entrant viability fell to ${results.entrant_viability}%`;
+        } else {
+            document.getElementById('entrant-viability').textContent = '—';
+        }
     }
     
     getHoverText(moatPressure) {
