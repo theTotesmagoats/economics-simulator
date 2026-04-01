@@ -36,17 +36,49 @@ The fixed left-to-right layout shows:
 - 🔴 Red ring = value decreased
 - 🟢 Green ring = value increased
 - Number above node = percentage change
+- **Green edges** = positive relationship (A↑ → B↑)
+- **Red edges** = negative relationship (A↑ → B↓)
 - Click any node for detailed explanation
 
-### 3. Industry Structure Panel (Center, Bottom)
+### 3. Active Chain Strip
+Shows the exact causal path that activated when you moved a slider:
+```
+Tariff → Import Price ↑ → Domestic Price ↑ → Demand ↓ → Imports ↓ → Rents ↑ → Lobbying ↑
+```
+
+### 4. Industry Structure Panel (Center, Bottom)
 Shows how protection affects who survives:
 - **Large blue circles** = incumbent firms
 - **Small orange circles** = small businesses/challengers
 - As moat pressure rises: incumbents grow, small firms shrink and exit
+- Status summary shows: "3 incumbents gained +X% protected share", "Y of 15 challengers remain viable"
 
-### 4. Tradeoff Snapshot & Metrics (Right Panel)
+### 5. Tradeoff Snapshot & Metrics (Right Panel)
 - Who wins, who loses, hidden costs
+- **Who's Affected?** panel shows directional impact on each group
 - Key economic indicators update in real-time
+
+---
+
+## Teaching Features
+
+### Explain Mode vs Explore Mode
+Toggle the 📚 **Explain Mode** checkbox:
+
+| Explain Mode (default) | Explore Mode |
+|------------------------|--------------|
+| Slower animation with pauses | Faster updates |
+| Callout bubbles explain each step | Minimal callouts |
+| Clearer teaching chain visible | Quick exploration |
+
+### What the Graph Teaches Visually
+
+When you move a slider, watch for:
+1. **Origin**: Where did the change start? (source node pulses)
+2. **Chain**: Which exact path activated? (edges highlight in sequence)
+3. **Direction**: Did each variable go up or down? (green/red rings)
+4. **Magnitude**: How big was the effect? (percentage badges)
+5. **Consequences**: Who benefited and who paid? (tradeoff panel)
 
 ---
 
@@ -79,6 +111,7 @@ Policy → Price Change → Quantity Response → Rent Creation → Lobbying →
 3. **Watch the Industry Structure panel** — incumbents grow, small firms shrink
 4. **Click any glowing node** for detailed explanation
 5. **Check Tradeoff Snapshot** — see who won and who lost
+6. **Toggle Explain Mode off** to explore faster
 
 ---
 
