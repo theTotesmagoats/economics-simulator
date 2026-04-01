@@ -3,19 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Economics Simulator | Protectionism & Rent-Seeking</title>
+    <title>Economics Simulator | Policy Consequences</title>
     <link rel="stylesheet" href="css/styles.css">
     <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
     <header>
-        <h1>Economics Simulator</h1>
-        <p class="subtitle">Chicago School Framework • Protectionism & Rent-Seeking</p>
+        <h1>Policy Consequence Simulator</h1>
+        <p class="subtitle">Explore how interventions change incentives, behavior, and who ultimately benefits</p>
     </header>
+    
+    <!-- Onboarding Strip -->
+    <div id="onboarding-strip" class="onboarding">
+        <span>📌 Move a policy slider → watch the highlighted path → see who gains and loses → click any glowing node for details</span>
+        <button onclick="document.getElementById('onboarding-strip').style.display='none'">✓ Got it</button>
+    </div>
+    
+    <!-- What Just Changed? Summary Strip -->
+    <div id="summary-strip" class="summary-strip hidden">
+        <h4>What Just Changed?</h4>
+        <p id="summary-text"></p>
+    </div>
     
     <div id="app">
         <aside id="controls">
             <h2>Policy Controls</h2>
+            
+            <!-- Legend -->
+            <div class="legend">
+                <h4>Legend</h4>
+                <div class="legend-item"><span class="legend-color policy"></span> Policy</div>
+                <div class="legend-item"><span class="legend-color market"></span> Market/Price</div>
+                <div class="legend-item"><span class="legend-color quantity"></span> Quantity</div>
+                <div class="legend-item"><span class="legend-color welfare"></span> Welfare</div>
+                <div class="legend-item"><span class="legend-color rent-seeking"></span> Rent-Seeking</div>
+                <div class="legend-divider"></div>
+                <div class="legend-item"><span class="legend-ring up"></span> Increased</div>
+                <div class="legend-item"><span class="legend-ring down"></span> Decreased</div>
+            </div>
             
             <div class="control-group">
                 <label for="tariff-rate">Import Tariff Rate</label>
@@ -30,7 +55,7 @@
             </div>
             
             <div class="control-group">
-                <label for="lobbying-intensity">Political Environment</label>
+                <label for="lobbying-intensity">Lobbying Intensity</label>
                 <input type="range" id="lobbying-intensity" min="1" max="10" value="5" step="1">
                 <span id="lobbying-display">Medium</span>
             </div>
@@ -85,17 +110,30 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- Info Panel -->
-            <div id="info-panel" class="hidden">
-                <h3 id="node-title"></h3>
-                <p id="node-value"></p>
-                <p id="node-explanation"></p>
-                <button id="close-info">Close</button>
-            </div>
         </main>
         
         <aside id="metrics">
+            <!-- Tradeoff Snapshot Panel -->
+            <div id="tradeoff-panel">
+                <h3>Tradeoff Snapshot</h3>
+                <div class="tradeoff-item">
+                    <span class="tradeoff-label">Biggest Winner</span>
+                    <span id="biggest-winner" class="tradeoff-value">—</span>
+                </div>
+                <div class="tradeoff-item">
+                    <span class="tradeoff-label">Biggest Loser</span>
+                    <span id="biggest-loser" class="tradeoff-value">—</span>
+                </div>
+                <div class="tradeoff-item hidden-cost">
+                    <span class="tradeoff-label">Hidden Cost Bearer</span>
+                    <span id="hidden-cost-bearer" class="tradeoff-value">—</span>
+                </div>
+                <div class="tradeoff-item risk">
+                    <span class="tradeoff-label">Delayed Risk Building</span>
+                    <span id="delayed-risk" class="tradeoff-value">—</span>
+                </div>
+            </div>
+            
             <h2>Economic Metrics</h2>
             <div class="metric-card">
                 <span class="label">Consumer Price</span>
@@ -126,6 +164,14 @@
                 <span id="deadweight-loss" class="value">$0</span>
             </div>
         </aside>
+    </div>
+    
+    <!-- Info Panel -->
+    <div id="info-panel" class="hidden">
+        <h3 id="node-title"></h3>
+        <p id="node-value"></p>
+        <p id="node-explanation"></p>
+        <button id="close-info">Close</button>
     </div>
     
     <footer>
