@@ -213,6 +213,11 @@ class IndustryStructure {
     }
     
     updateMetrics(results) {
+        // CRITICAL FIX #2: Guard against missing DOM elements
+        // These IDs don't exist in index.html yet - either add them or skip silently
+        const moatBar = document.getElementById('moat-bar');
+        if (!moatBar) return;  // Temporary guard until markup exists
+        
         // Update moat pressure bar
         const moatPercent = Math.round(results.moat_pressure * 100);
         document.getElementById('moat-bar').style.width = `${moatPercent}%`;
