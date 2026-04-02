@@ -10,49 +10,43 @@
 <body>
     <header>
         <h1>Policy Consequence Simulator</h1>
-        <p class="subtitle">Explore how interventions change incentives, behavior, and who ultimately benefits</p>
+        <p class="subtitle">Follow the incentives, trace the tradeoffs — from intervention to unintended consequences</p>
     </header>
     
     <!-- Onboarding Strip -->
     <div id="onboarding-strip" class="onboarding">
-        <span>📌 Move a policy slider → watch the highlighted path → see who gains and loses → click any glowing node for details</span>
+        <span>📌 Move a policy slider → watch the pulse travel left-to-right → see who gains and loses → toggle X-Ray for hidden costs</span>
         <button onclick="document.getElementById('onboarding-strip').style.display='none'">✓ Got it</button>
     </div>
     
-    <!-- What Just Changed? Summary Strip -->
-    <div id="summary-strip" class="summary-strip hidden">
-        <h4>What Just Changed?</h4>
-        <p id="summary-text"></p>
+    <!-- Bastiat Toggle (X-Ray Vision) -->
+    <div id="bastiat-toggle-container" class="bastiat-toggle">
+        <span class="toggle-label">🔍 That Which Is Seen</span>
+        <label class="switch">
+            <input type="checkbox" id="xray-checkbox">
+            <span class="slider"></span>
+        </label>
+        <span class="toggle-label xray-active">💀 That Which Is Unseen (X-Ray)</span>
     </div>
     
-    <!-- Active Chain Strip (shows the causal path that activated) -->
-    <div id="chain-strip" class="chain-strip hidden">
-        <span id="chain-label">Active Chain:</span>
-        <span id="chain-path"></span>
-    </div>
-    
-    <!-- Teaching Mode Toggle -->
-    <div id="teaching-mode-toggle" class="teaching-mode-toggle">
-        <label for="explain-mode-checkbox">📚 Explain Mode</label>
-        <input type="checkbox" id="explain-mode-checkbox" checked>
-        <span class="mode-description">Slower animation with callouts • Toggle off for faster exploration</span>
-    </div>
-    
+    <!-- Temporal Cascade Layout: Left-to-Right Flow -->
     <div id="app">
-        <aside id="controls">
-            <h2>Policy Controls</h2>
+        <!-- COLUMN 1: THE LEVER (Policy Controls) -->
+        <aside id="controls-column" class="column lever">
+            <h2>🎛️ The Lever</h2>
+            <p class="column-description">Intervention begins here. Every policy creates incentives.</p>
             
             <!-- Legend -->
             <div class="legend">
-                <h4>Legend</h4>
-                <div class="legend-item"><span class="legend-color policy"></span> Policy</div>
-                <div class="legend-item"><span class="legend-color market"></span> Market/Price</div>
-                <div class="legend-item"><span class="legend-color quantity"></span> Quantity</div>
-                <div class="legend-item"><span class="legend-color welfare"></span> Welfare</div>
+                <h4>Causal Graph Key</h4>
+                <div class="legend-item"><span class="legend-color policy"></span> Policy Input</div>
+                <div class="legend-item"><span class="legend-color market"></span> Price Signal</div>
+                <div class="legend-item"><span class="legend-color quantity"></span> Quantity Response</div>
+                <div class="legend-item"><span class="legend-color welfare"></span> Welfare Effect</div>
                 <div class="legend-item"><span class="legend-color rent-seeking"></span> Rent-Seeking</div>
                 <div class="legend-divider"></div>
-                <div class="legend-item"><span class="legend-edge positive"></span> Positive (↑→↑)</div>
-                <div class="legend-item"><span class="legend-edge negative"></span> Negative (↑→↓)</div>
+                <div class="legend-item"><span class="legend-edge positive"></span> Direct (↑→↑)</div>
+                <div class="legend-item"><span class="legend-edge negative"></span> Inverse (↑→↓)</div>
             </div>
             
             <div class="control-group">
@@ -76,18 +70,26 @@
             <button id="reset-btn">Reset to Free Trade</button>
         </aside>
         
-        <main id="visualization">
+        <!-- COLUMN 2: THE TRANSMISSION (Causal Mechanism + Industry Structure) -->
+        <main id="transmission-column" class="column transmission">
             <!-- Causal Graph Panel -->
             <div id="causal-panel">
-                <h3>Causal Mechanism</h3>
-                <p class="panel-description">Green edges = variables move together • Red edges = variables move oppositely</p>
+                <h3>⚙️ The Transmission</h3>
+                <p class="panel-description">Policy distorts prices → quantities respond → rents emerge → politics captures the prize</p>
+                
+                <!-- Active Chain Strip (moved here) -->
+                <div id="chain-strip" class="chain-strip hidden">
+                    <span id="chain-label">Active Path:</span>
+                    <span id="chain-path"></span>
+                </div>
+                
                 <div id="graph-container"></div>
             </div>
             
             <!-- Industry Structure Panel -->
             <div id="industry-panel">
-                <h3>Industry Structure</h3>
-                <p class="panel-description">Policy here changes who can survive, not just prices.</p>
+                <h3>🏭 The Cantillon Effect</h3>
+                <p class="panel-description">Those closest to protection benefit first. Those at the periphery starve.</p>
                 <div id="industry-container"></div>
                 
                 <!-- Industry Status Summary -->
@@ -96,44 +98,14 @@
                     <span id="challenger-remain" class="status-item">—</span>
                     <span id="entrant-viability" class="status-item">—</span>
                 </div>
-                
-                <div id="industry-metrics">
-                    <div class="mini-metric">
-                        <span class="mini-label">Moat Pressure</span>
-                        <div class="mini-bar-container">
-                            <div id="moat-bar" class="mini-bar"></div>
-                        </div>
-                        <span id="moat-value" class="mini-value">0%</span>
-                    </div>
-                    
-                    <div class="mini-metric">
-                        <span class="mini-label">Market Concentration</span>
-                        <div class="mini-bar-container">
-                            <div id="concentration-bar" class="mini-bar warning"></div>
-                        </div>
-                        <span id="concentration-value" class="mini-value">0%</span>
-                    </div>
-                    
-                    <div class="mini-metric">
-                        <span class="mini-label">Small Biz Survival</span>
-                        <div class="mini-bar-container">
-                            <div id="survival-bar" class="mini-bar positive"></div>
-                        </div>
-                        <span id="survival-value" class="mini-value">100%</span>
-                    </div>
-                    
-                    <div class="mini-metric">
-                        <span class="mini-label">Entrant Viability</span>
-                        <div class="mini-bar-container">
-                            <div id="entrant-bar" class="mini-bar positive"></div>
-                        </div>
-                        <span id="entrant-value" class="mini-value">100%</span>
-                    </div>
-                </div>
             </div>
         </main>
         
-        <aside id="metrics">
+        <!-- COLUMN 3: THE FALLOUT (Tradeoffs + Metrics) -->
+        <aside id="fallout-column" class="column fallout">
+            <h2>📊 The Fallout</h2>
+            <p class="column-description">Consequences cascade. Winners, losers, and the invisible graveyard.</p>
+            
             <!-- Tradeoff Snapshot Panel -->
             <div id="tradeoff-panel">
                 <h3>Tradeoff Snapshot</h3>
@@ -176,34 +148,45 @@
                 </div>
             </div>
             
-            <h2>Economic Metrics</h2>
-            <div class="metric-card">
-                <span class="label">Consumer Price</span>
-                <span id="consumer-price" class="value">$100</span>
-            </div>
-            <div class="metric-card">
-                <span class="label">Domestic Production</span>
-                <span id="domestic-production" class="value">50 units</span>
-            </div>
-            <div class="metric-card">
-                <span class="label">Imports</span>
-                <span id="imports" class="value">50 units</span>
-            </div>
-            <div class="metric-card">
-                <span class="label">Gov't Revenue</span>
-                <span id="gov-revenue" class="value">$0</span>
-            </div>
-            <div class="metric-card rent-seeking">
-                <span class="label">Economic Rents Created</span>
-                <span id="rents-created" class="value">$0</span>
-            </div>
-            <div class="metric-card rent-seeking">
-                <span class="label">Lobbying Expenditure</span>
-                <span id="lobbying-cost" class="value">$0</span>
-            </div>
-            <div class="metric-card negative">
-                <span class="label">Deadweight Loss</span>
-                <span id="deadweight-loss" class="value">$0</span>
+            <!-- Delta Metrics (replacing static numbers) -->
+            <div id="delta-metrics">
+                <h3>Delta Indicators</h3>
+                
+                <div class="delta-card" id="delta-price">
+                    <span class="delta-label">Consumer Price</span>
+                    <span class="delta-value" id="delta-price-val">$100.0</span>
+                    <span class="delta-context" id="delta-price-context">Baseline</span>
+                </div>
+                
+                <div class="delta-card" id="delta-production">
+                    <span class="delta-label">Domestic Production</span>
+                    <span class="delta-value" id="delta-prod-val">50 units</span>
+                    <span class="delta-context" id="delta-prod-context">Baseline</span>
+                </div>
+                
+                <div class="delta-card" id="delta-imports">
+                    <span class="delta-label">Imports</span>
+                    <span class="delta-value" id="delta-import-val">50 units</span>
+                    <span class="delta-context" id="delta-import-context">Baseline</span>
+                </div>
+                
+                <div class="delta-card rent-created" id="delta-rents">
+                    <span class="delta-label">Economic Rents Created</span>
+                    <span class="delta-value" id="delta-rent-val">$0</span>
+                    <span class="delta-context" id="delta-rent-context">The "prize" motivating rent-seeking</span>
+                </div>
+                
+                <div class="delta-card lobbying-cost" id="delta-lobbying">
+                    <span class="delta-label">Lobbying Expenditure</span>
+                    <span class="delta-value" id="delta-lobby-val">$0</span>
+                    <span class="delta-context" id="delta-lobby-context">Resources wasted on political competition</span>
+                </div>
+                
+                <div class="delta-card invisible-graveyard" id="delta-dwl">
+                    <span class="delta-label">The Invisible Graveyard</span>
+                    <span class="delta-value" id="delta-dwl-val">$0</span>
+                    <span class="delta-context" id="delta-dwl-context">Lost economic opportunity (deadweight loss)</span>
+                </div>
             </div>
         </aside>
     </div>
@@ -222,7 +205,7 @@
     </div>
     
     <footer>
-        <p>Inspired by Milton Friedman & Thomas Sowell • Follow the incentives, trace the tradeoffs</p>
+        <p>Bastiat's "Seen vs Unseen" • Cantillon Effect • Chicago School Economics</p>
     </footer>
     
     <script src="js/model.js"></script>
