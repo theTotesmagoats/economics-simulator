@@ -41,6 +41,15 @@ class EconomicSimulation {
     }
     
     /**
+     * CRITICAL FIX #5: Renamed from freeTradeEquilibriumPrice() for clarity
+     * This returns AUTARKY price ($125), NOT world price or free trade equilibrium
+     */
+    autarkyEquilibriumPrice() {
+        return (this.parameters.demandIntercept - this.parameters.supplyIntercept) / 
+               (this.parameters.demandSlope + this.parameters.supplySlope);
+    }
+    
+    /**
      * Calculate producer surplus at a given price
      * PS = area above supply curve and below price line
      * For linear supply Qs = c + d×P (or P = -c/d + Q/d):
@@ -253,12 +262,6 @@ class EconomicSimulation {
         results.incumbent_share_advantage = Math.round(results.moat_pressure * 40);  // Up to +40%
         
         return results;
-    }
-    
-    freeTradeEquilibriumPrice() {
-        // Legacy name - this actually returns AUTARKY price
-        return (this.parameters.demandIntercept - this.parameters.supplyIntercept) / 
-               (this.parameters.demandSlope + this.parameters.supplySlope);
     }
     
     getBaselineResults() {
