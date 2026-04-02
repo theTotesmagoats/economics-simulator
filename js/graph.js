@@ -1,398 +1,345 @@
-// Causal Graph Visualization - Teaching-Focused Design
-// Fixed layout with delta rings and staged propagation animation
+// Graph Visualization with Cantillon Heatmap & Pulse Animation
+// Force-directed layout with neutral path colors, welfare-reserved green/red
 
 class CausalGraph {
-    constructor(containerId, width, height) {
-        this.container = d3.select(`#${containerId}`);
-        this.width = width;
-        this.height = height;
+    constructor(containerId, model) {
+        this.container = document.getElementById(containerId);
+        this.model = model;
+        this.width = this.container.clientWidth;
+        this.height = this.container.clientHeight;
         
-        // Layout configuration
-        this.layout = {
-            columns: 5,
-            columnWidth: 140,
-            rowHeight: 70,
-            nodeRadius: 22,
-            margin: { top: 30, right: 30, bottom: 60, left: 40 }
-        };
-        
-        // Color scheme
+        // Neutral path colors - blue/orange for causal direction
+        // Green/red reserved strictly for welfare gain/loss
         this.colors = {
-            policy: '#ef4444',      // Red for policies
-            market: '#3b82f6',      // Blue for market variables
-            quantity: '#60a5fa',    // Lighter blue for quantities
-            welfare: '#10b981',     // Green for welfare
-            'rent-seeking': '#f59e0b', // Orange for rent-seeking
-            political: '#f97316'    // Darker orange for political
+            policy: '#ef4444',      // Red - intervention source
+            market: '#3b82f6',      // Blue - price signals  
+            quantity: '#60a5fa',    // Light blue - quantities
+            welfare: '#10b981',     // Green - ONLY for positive welfare
+            'rent-seeking': '#f59e0b', // Orange - rent creation
+            political: '#f97316',   // Dark orange - political feedback
+            
+            // Edge colors - neutral, no moral signaling
+            edgePositive: '#60a5fa',  // Blue arrow - direct relationship
+            edgeNegative: '#fb923c',  // Orange arrow - inverse relationship
+            
+            // Welfare-specific (ONLY for surplus/loss)
+            welfareGain: '#22c55e',   // Green - ONLY welfare gain
+            welfareLoss: '#ef4444'    // Red - ONLY welfare loss/deadweight
         };
         
         this.svg = null;
-        this.nodeElements = null;
-        this.linkElements = null;
-        this.nodeData = [];
-        this.activePath = new Set();
-        this.animationToken = 0; // For canceling stale animations
-        this.explainMode = true; // Default to explain mode
+        this.nodes = new Map();
+        this.edges = [];
+        this.activePath = [];
+        this.pulseAnimation = null;
+        
+        this.init();
     }
     
-    init(data) {
-        console.log('Initializing causal graph with', data.nodes.length, 'nodes');
+    init() {
+        // Clear container
+        this.container.innerHTML = '';
         
-        // Create SVG inside the div container
-        this.svg = this.container.append('svg')
-            .attr('width', this.width)
-            .attr('height', this.height);
+        // Create SVG with proper viewBox
+        this.svg = d3.select(this.container)
+            .append('svg')
+            .attr('width', '100%')
+            .attr('height', '100%')
+            .attr('viewBox', `0 0 ${this.width} ${this.height}`);
         
-        // Add background
-        this.svg.append('rect')
-            .attr('width', this.width)
-            .attr('height', this.height)
-            .attr('fill', '#16213e');
-        
-        // Create marker definitions for arrowheads
+        // Define markers for arrowheads
         const defs = this.svg.append('defs');
         
-        // Green marker for positive relationships
+        // Blue arrowhead (direct relationship)
         defs.append('marker')
             .attr('id', 'arrow-positive')
-            .attr('viewBox', '0 0 10 10')
+            .attr('viewBox', '0 -5 10 10')
             .attr('refX', 8)
-            .attr('refY', 5)
+            .attr('refY', 0)
             .attr('markerWidth', 6)
             .attr('markerHeight', 6)
-            .attr('orient', 'auto-start-reverse')
+            .attr('orient', 'auto')
             .append('path')
-            .attr('d', 'M0,0 L10,5 L0,10 Z')
-            .attr('fill', '#22c55e');
+            .attr('d', 'M0,-5L10,0L0,5')
+            .attr('fill', this.colors.edgePositive);
         
-        // Red marker for negative relationships
+        // Orange arrowhead (inverse relationship)
         defs.append('marker')
             .attr('id', 'arrow-negative')
-            .attr('viewBox', '0 0 10 10')
+            .attr('viewBox', '0 -5 10 10')
             .attr('refX', 8)
-            .attr('refY', 5)
+            .attr('refY', 0)
             .attr('markerWidth', 6)
             .attr('markerHeight', 6)
-            .attr('orient', 'auto-start-reverse')
+            .attr('orient', 'auto')
             .append('path')
-            .attr('d', 'M0,0 L10,5 L0,10 Z')
-            .attr('fill', '#ef4444');
+            .attr('d', 'M0,-5L10,0L0,5')
+            .attr('fill', this.colors.edgeNegative);
         
-        // Store node data with computed positions
-        this.nodeData = data.nodes.map(node => {
-            const col = node.column || 0;
-            const row = node.row || 0;
-            return {
-                ...node,
-                x: this.layout.margin.left + col * this.layout.columnWidth,
-                y: this.layout.margin.top + row * this.layout.rowHeight
-            };
-        });
+        // Glow filter for Cantillon effect
+        defs.append('filter')
+            .attr('id', 'cantillon-glow')
+            .attr('x', '-50%')
+            .attr('y', '-50%')
+            .attr('width', '200%')
+            .attr('height', '200%')
+            .append('feGaussianBlur')
+            .attr('stdDeviation', '3')
+            .attr('result', 'coloredBlur');
         
-        // Render graph
-        this.render(data.edges);
+        const feMerge = defs.append('feMerge');
+        feMerge.append('feMergeNode').attr('in', 'coloredBlur');
+        feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+        
+        this.render();
     }
     
-    render(edges) {
-        // Draw links first (so they appear behind nodes)
-        const linkData = edges.map(edge => ({
-            source: this.nodeData.find(n => n.id === edge.from),
-            target: this.nodeData.find(n => n.id === edge.to),
-            relationship: edge.relationship,
-            strength: edge.strength
-        })).filter(l => l.source && l.target);
+    render() {
+        const nodes = this.model.getAllNodes();
+        const edges = this.model.edges;
         
-        // Color-code edges by relationship sign:
-        // Green = positive/direct (A↑ → B↑)
-        // Red = negative/inverse (A↑ → B↓)
-        this.linkElements = this.svg.append('g').attr('class', 'links')
-            .selectAll('.link')
-            .data(linkData)
-            .enter().append('line')
-            .attr('class', d => `link ${d.relationship}`)
-            .attr('x1', d => d.source.x)
-            .attr('y1', d => d.source.y)
-            .attr('x2', d => d.target.x)
-            .attr('y2', d => d.target.y)
-            .attr('stroke', d => d.strength > 0 ? '#22c55e' : '#ef4444')
-            .attr('stroke-width', 1.5)
-            .attr('stroke-opacity', 0.6)
-            .attr('marker-end', d => d.strength > 0 ? 'url(#arrow-positive)' : 'url(#arrow-negative)');
+        // Calculate positions using fixed column layout with force-directed refinement
+        const nodePositions = this.calculatePositions(nodes);
         
-        // Draw nodes
-        this.nodeElements = this.svg.append('g').attr('class', 'nodes')
-            .selectAll('.node')
-            .data(this.nodeData)
+        // Store positions on nodes
+        nodes.forEach(node => {
+            node.x = nodePositions[node.id].x;
+            node.y = nodePositions[node.id].y;
+        });
+        
+        // Create edge group (rendered first so edges are behind nodes)
+        const edgeGroup = this.svg.append('g').attr('class', 'edges');
+        
+        // Render edges with Cantillon heatmap overlay
+        this.edges = edgeGroup.selectAll('.edge')
+            .data(edges, d => `${d.from}-${d.to}`)
             .enter().append('g')
-            .attr('class', d => `node node-${d.type}`)
-            .attr('data-id', d => d.id)  // Add data-id for reliable selection
-            .attr('data-type', d => d.type)
-            .attr('transform', d => `translate(${d.x}, ${d.y})`);
+            .attr('class', 'edge-group')
+            .each(d => {
+                const fromNode = nodes.find(n => n.id === d.from);
+                const toNode = nodes.find(n => n.id === d.to);
+                
+                // Base edge
+                edgeGroup.append('line')
+                    .attr('class', 'edge-base')
+                    .attr('x1', fromNode.x)
+                    .attr('y1', fromNode.y)
+                    .attr('x2', toNode.x)
+                    .attr('y2', toNode.y)
+                    .attr('stroke', d.strength >= 0 ? this.colors.edgePositive : this.colors.edgeNegative)
+                    .attr('stroke-width', 1.5)
+                    .attr('stroke-opacity', 0.3)
+                    .attr('marker-end', `url(#arrow${d.strength >= 0 ? '-positive' : '-negative'})`);
+                
+                // Cantillon heatmap overlay - thickens based on lobbying intensity
+                edgeGroup.append('line')
+                    .attr('class', 'edge-cantillon')
+                    .attr('x1', fromNode.x)
+                    .attr('y1', fromNode.y)
+                    .attr('x2', toNode.x)
+                    .attr('y2', toNode.y)
+                    .attr('stroke', this.colors['rent-seeking'])
+                    .attr('stroke-width', 0)
+                    .attr('stroke-opacity', 0)
+                    .style('filter', 'url(#cantillon-glow)');
+            });
         
-        // Delta ring (outer circle showing increase/decrease)
-        this.nodeElements.append('circle')
-            .attr('class', 'delta-ring')
-            .attr('r', this.layout.nodeRadius + 6)
-            .attr('fill', 'none')
-            .attr('stroke-width', 3)
-            .attr('stroke-opacity', 0);
+        // Create node group
+        const nodeGroup = this.svg.append('g').attr('class', 'nodes');
         
-        // Main node circle
-        this.nodeElements.append('circle')
-            .attr('class', 'node-circle')
-            .attr('r', this.layout.nodeRadius)
-            .attr('fill', d => this.colors[d.type] || '#667eea');
+        this.nodes = nodeGroup.selectAll('.node')
+            .data(nodes, d => d.id)
+            .enter().append('g')
+            .attr('class', 'node')
+            .attr('transform', d => `translate(${d.x},${d.y})`)
+            .on('click', (event, d) => this.onNodeClick(event, d))
+            .each(function(d) {
+                const nodeEl = d3.select(this);
+                
+                // Node circle with size variation for Cantillon effect
+                nodeEl.append('circle')
+                    .attr('class', 'node-circle')
+                    .attr('r', 16)
+                    .attr('fill', d.type === 'welfare' && d.id.includes('surplus') ? 
+                        this.colors.welfareGain : 
+                        d.type === 'welfare' && d.id.includes('dwl') ?
+                        this.colors.welfareLoss :
+                        this.colors[d.type] || '#888')
+                    .attr('stroke', '#1a1a2e')
+                    .attr('stroke-width', 2)
+                    .style('filter', null);
+                
+                // Node label
+                nodeEl.append('text')
+                    .attr('class', 'node-label')
+                    .attr('y', 35)
+                    .attr('text-anchor', 'middle')
+                    .attr('fill', '#e2e8f0')
+                    .attr('font-size', '10px')
+                    .attr('font-weight', '500')
+                    .text(d.name);
+                
+                // Delta badge (appears when value changes)
+                nodeEl.append('text')
+                    .attr('class', 'delta-badge')
+                    .attr('y', -22)
+                    .attr('text-anchor', 'middle')
+                    .attr('fill', '#fff')
+                    .attr('font-size', '9px')
+                    .attr('font-weight', 'bold')
+                    .style('display', 'none');
+            });
         
-        // Node label
-        this.nodeElements.append('text')
-            .attr('class', 'node-label')
-            .attr('dy', this.layout.nodeRadius + 18)
-            .attr('text-anchor', 'middle')
-            .attr('fill', '#e2e8f0')
-            .attr('font-size', '10px')
-            .style('text-shadow', '0 0 3px #000')
-            .text(d => this.truncateLabel(d.name, 14));
+        // Apply initial Cantillon effect
+        this.updateCantillonEffect();
+    }
+    
+    calculatePositions(nodes) {
+        const positions = {};
+        const columnWidth = this.width / 6; // 6 columns max
+        const marginX = 40;
+        const marginY = 30;
         
-        // Delta badge (shows +X% or -X%)
-        this.nodeElements.append('text')
-            .attr('class', 'delta-badge')
-            .attr('dy', -this.layout.nodeRadius - 6)
-            .attr('text-anchor', 'middle')
-            .attr('fill', '#fff')
-            .attr('font-size', '9px')
-            .attr('font-weight', 'bold')
-            .style('opacity', 0);
-        
-        // Make nodes clickable
-        this.nodeElements.on('click', (event, d) => {
-            event.stopPropagation();
-            window.simulator.showNodeInfo(d.id);
+        // Group nodes by column
+        const columns = {};
+        nodes.forEach(node => {
+            const col = node.column || 0;
+            if (!columns[col]) columns[col] = [];
+            columns[col].push(node);
         });
-    }
-    
-    truncateLabel(text, maxLength) {
-        if (text.length <= maxLength) return text;
-        return text.substring(0, maxLength - 1) + '…';
-    }
-    
-    // Update node values and show delta rings
-    updateValues(results, changes, sourceNodeId = null) {
-        console.log('Updating graph values');
         
-        const affectedNodes = [];
+        // Sort column keys
+        const sortedCols = Object.keys(columns).sort((a, b) => a - b);
         
-        // Update each node's data
-        this.nodeData.forEach(node => {
-            const result = results[node.id];
-            const change = changes ? changes[node.id] : null;
+        // Calculate positions with high repulsion for clarity
+        sortedCols.forEach(col => {
+            const colNodes = columns[col];
+            const colX = marginX + (parseInt(col) + 0.5) * columnWidth;
+            const availableHeight = this.height - 2 * marginY;
+            const nodeSpacing = availableHeight / (colNodes.length + 1);
             
-            if (result !== undefined) {
-                node.value = result;
-                node.change = change ? change.change : 0;
-                node.changePercent = change ? change.changePercent : 0;
-                
-                // Track affected nodes for animation
-                if (Math.abs(node.changePercent) > 1) {
-                    affectedNodes.push(node.id);
-                }
+            colNodes.forEach((node, idx) => {
+                positions[node.id] = {
+                    x: colX,
+                    y: marginY + (idx + 1) * nodeSpacing
+                };
+            });
+        });
+        
+        return positions;
+    }
+    
+    updateCantillonEffect() {
+        const lobbyingNode = this.model.getNode('lobbying_intensity') || 
+                            this.model.getNode('lobbying_effort');
+        const lobbyingValue = lobbyingNode ? lobbyingNode.value : 5;
+        const lobbyingNormalized = Math.min(lobbyingValue / 10, 1); // 0 to 1
+        
+        // Define center nodes (benefit from protection) vs periphery (starve)
+        const centerNodes = ['producer_surplus', 'economic_rent', 'gov_revenue', 'political_influence'];
+        const peripheryNodes = ['consumer_surplus', 'total_dwl', 'imports', 'consumer_demand'];
+        
+        // Update node sizes and opacity
+        this.nodes.each(function(node) {
+            const el = d3.select(this);
+            const circle = el.select('.node-circle');
+            
+            if (centerNodes.includes(node.id)) {
+                // Center nodes grow with lobbying
+                const sizeMultiplier = 1 + lobbyingNormalized * 0.4;
+                circle.attr('r', 16 * sizeMultiplier)
+                      .style('filter', lobbyingNormalized > 0.3 ? 'url(#cantillon-glow)' : null);
+            } else if (peripheryNodes.includes(node.id)) {
+                // Periphery nodes fade/starve with lobbying
+                const opacity = 1 - lobbyingNormalized * 0.5;
+                circle.attr('r', Math.max(10, 16 * (1 - lobbyingNormalized * 0.2)))
+                      .attr('opacity', opacity);
             }
         });
         
-        // Update delta rings and badges
-        this.nodeElements.select('.delta-ring')
-            .transition().duration(300)
-            .attr('stroke', d => {
-                if (Math.abs(d.changePercent) < 1) return 'transparent';
-                return d.change > 0 ? '#22c55e' : '#ef4444'; // Green or red
-            })
-            .attr('stroke-opacity', d => Math.min(1, Math.abs(d.changePercent) / 30));
-        
-        this.nodeElements.select('.delta-badge')
-            .text(d => {
-                if (Math.abs(d.changePercent) < 1) return '';
-                const sign = d.change > 0 ? '+' : '';
-                return `${sign}${d.changePercent.toFixed(0)}%`;
-            })
-            .style('opacity', d => Math.abs(d.changePercent) > 1 ? 1 : 0)
-            .style('fill', d => d.change > 0 ? '#22c55e' : (d.change < 0 ? '#ef4444' : '#fff'));
-        
-        // Animate propagation if source node specified
-        if (sourceNodeId && affectedNodes.length > 0) {
-            this.animatePropagation(sourceNodeId, affectedNodes);
+        // Update edge thickness for Cantillon effect
+        // Edges connecting to center nodes thicken with lobbying
+        d3.selectAll('.edge-cantillon').each(function(edge) {
+            const isCenterEdge = centerNodes.includes(edge.to) || centerNodes.includes(edge.from);
+            if (isCenterEdge) {
+                const thickness = lobbyingNormalized * 4;
+                d3.select(this)
+                    .attr('stroke-width', thickness)
+                    .attr('stroke-opacity', Math.min(lobbyingNormalized, 0.8));
+            } else {
+                d3.select(this)
+                    .attr('stroke-width', 0)
+                    .attr('stroke-opacity', 0);
+            }
+        });
+    }
+    
+    triggerPulseAnimation(path) {
+        // Clear any existing animation
+        if (this.pulseAnimation) {
+            clearTimeout(this.pulseAnimation);
         }
-    }
-    
-    // Staged animation showing causal chain activation
-    animatePropagation(sourceId, affectedNodeIds) {
-        console.log('Animating propagation from', sourceId);
         
-        // Increment animation token - old animations will check this and cancel
-        this.animationToken++;
-        const currentToken = this.animationToken;
+        this.activePath = path;
         
-        // Reset all to dimmed state first
-        this.dimInactive();
+        // Animate pulse along the path
+        let step = 0;
+        const totalSteps = path.length * 3; // 3 frames per segment
         
-        // Find path from source through affected nodes using teaching paths
-        const path = this.findTeachingPath(sourceId, affectedNodeIds);
-        
-        if (path.length === 0) return;
-        
-        // Animate each node in sequence
-        let delay = 0;
-        const stepDelay = this.explainMode ? 400 : 150; // Slower in explain mode
-        
-        path.forEach((nodeId, index) => {
-            setTimeout(() => {
-                // Check if animation is still valid (not canceled by newer interaction)
-                if (this.animationToken !== currentToken) return;
-                
-                this.highlightNode(nodeId);
-                this.highlightEdgesForNode(nodeId);
-                
-                // Show callout in explain mode
-                if (this.explainMode && index > 0) {
-                    this.showCallout(nodeId, path[index - 1]);
-                }
-            }, delay);
-            delay += stepDelay;
-        });
-        
-        // After animation completes, restore normal appearance but keep delta rings
-        setTimeout(() => {
-            if (this.animationToken === currentToken) {
-                this.restoreAppearance();
+        const animateStep = () => {
+            if (step >= totalSteps) {
+                this.resetPulse();
+                return;
             }
-        }, delay + 500);
-    }
-    
-    // Teaching paths - intentional causal chains for pedagogy
-    findTeachingPath(sourceId, affectedIds) {
-        const teachingPaths = {
-            tariff: [
-                'tariff', 'import_price', 'domestic_price', 'consumer_demand',
-                'imports', 'economic_rent', 'lobbying_effort', 'political_influence', 'total_dwl'
-            ],
-            subsidy: [
-                'subsidy', 'producer_price', 'domestic_supply', 'producer_surplus',
-                'economic_rent', 'lobbying_effort', 'political_influence', 'total_dwl'
-            ],
-            lobbying_effort: [
-                'lobbying_effort', 'political_influence', 'total_dwl'
-            ]
+            
+            const edgeIndex = Math.floor(step / 3);
+            if (edgeIndex < path.length - 1) {
+                // Highlight current edge in pulse
+                d3.selectAll('.edge-base')
+                    .transition()
+                    .duration(100)
+                    .attr('stroke-opacity', (d, i) => {
+                        const from = d.from;
+                        const to = d.to;
+                        const isCurrentEdge = edgeIndex < path.length - 1 && 
+                            path[edgeIndex] === from && path[edgeIndex + 1] === to;
+                        return isCurrentEdge ? 1 : 0.3;
+                    });
+            }
+            
+            step++;
+            this.pulseAnimation = setTimeout(animateStep, 50);
         };
         
-        // Get the teaching path for this source
-        const basePath = teachingPaths[sourceId] || [sourceId];
-        
-        // Filter to only include affected nodes (plus source)
-        return basePath.filter(nodeId => nodeId === sourceId || affectedIds.includes(nodeId));
+        animateStep();
     }
     
-    highlightNode(nodeId) {
-        const node = this.nodeData.find(n => n.id === nodeId);
-        if (!node) return;
-        
-        // Select the exact node by data-id, not by category
-        const nodeSelection = d3.select(`.node[data-id="${nodeId}"]`);
-        
-        // Pulse the node
-        nodeSelection.select('.node-circle')
-            .transition().duration(150)
-            .attr('r', this.layout.nodeRadius + 4)
-            .transition().duration(150)
-            .attr('r', this.layout.nodeRadius);
-        
-        // Brighten the node
-        nodeSelection.select('.node-circle')
-            .transition().duration(200)
-            .attr('fill', '#fff')
-            .transition().duration(400)
-            .attr('fill', this.colors[node.type]);
+    resetPulse() {
+        d3.selectAll('.edge-base')
+            .attr('stroke-opacity', 0.3);
+        this.activePath = [];
     }
     
-    highlightEdgesForNode(nodeId) {
-        // Find and highlight edges connected to this node
-        const node = this.nodeData.find(n => n.id === nodeId);
-        if (!node) return;
-        
-        // Highlight outgoing edges
-        d3.selectAll('.link')
-            .filter(d => d.source.id === nodeId)
-            .transition().duration(200)
-            .attr('stroke', '#fff')
-            .attr('stroke-width', 3)
-            .attr('stroke-opacity', 1)
-            .transition().delay(400).duration(400)
-            .attr('stroke', d => d.strength > 0 ? '#22c55e' : '#ef4444')
-            .attr('stroke-width', 1.5)
-            .attr('stroke-opacity', 0.6);
+    onNodeClick(event, node) {
+        // Dispatch custom event for info panel
+        window.dispatchEvent(new CustomEvent('nodeInfo', { detail: node }));
     }
     
-    showCallout(nodeId, fromNodeId) {
-        const node = this.nodeData.find(n => n.id === nodeId);
-        if (!node) return;
-        
-        // Callout text based on node
-        const callouts = {
-            import_price: "Tariff lifted landed import cost.",
-            domestic_price: "Consumers now face a higher price floor.",
-            consumer_demand: "Higher prices suppress quantity demanded.",
-            imports: "Foreign supply is displaced.",
-            producer_price: "Subsidy lowers effective production cost.",
-            domestic_supply: "Producers respond to better margins.",
-            economic_rent: "Protected profits rise above competitive levels.",
-            lobbying_effort: "Rents attract political competition.",
-            political_influence: "Protection starts biasing future policy.",
-            total_dwl: "Society pays the unseen cost.",
-            producer_surplus: "Producers gain from higher effective prices."
-        };
-        
-        const text = callouts[nodeId] || `${node.name} changes.`;
-        
-        // Show callout bubble
-        const bubble = document.getElementById('callout-bubble');
-        const bubbleText = document.getElementById('callout-text');
-        
-        bubbleText.textContent = text;
-        bubble.classList.remove('hidden');
-        
-        // Position near the node
-        const x = node.x + this.layout.columnWidth * 0.5;
-        const y = node.y - 30;
-        bubble.style.left = `${x}px`;
-        bubble.style.top = `${y}px`;
-        bubble.style.transform = 'translateX(-50%)';
-        
-        // Hide after delay
-        setTimeout(() => {
-            bubble.classList.add('hidden');
-        }, this.explainMode ? 2000 : 1000);
-    }
-    
-    dimInactive() {
-        // Dim all nodes and edges temporarily
-        this.nodeElements.select('.node-circle')
-            .transition().duration(200)
-            .attr('opacity', 0.3);
-        
-        this.linkElements
-            .transition().duration(200)
-            .attr('stroke-opacity', 0.1);
-    }
-    
-    restoreAppearance() {
-        // Restore normal appearance
-        this.nodeElements.select('.node-circle')
-            .transition().duration(300)
-            .attr('opacity', 1);
-        
-        this.linkElements
-            .transition().duration(300)
-            .attr('stroke-opacity', 0.6);
-    }
-    
-    getNodeById(nodeId) {
-        return this.nodeData.find(d => d.id === nodeId);
+    updateDeltaBadges() {
+        this.nodes.each(function(node) {
+            const badge = d3.select(this).select('.delta-badge');
+            const change = node.change || 0;
+            
+            if (Math.abs(change) > 0.1) {
+                const sign = change > 0 ? '▲' : '▼';
+                const value = Math.abs(change).toFixed(1);
+                badge.text(`${sign}${value}`)
+                    .style('display', 'block')
+                    .attr('fill', node.type === 'welfare' ? 
+                        (change > 0 ? this.colors.welfareGain : this.colors.welfareLoss) : '#fff');
+            } else {
+                badge.style('display', 'none');
+            }
+        }, this);
     }
 }
