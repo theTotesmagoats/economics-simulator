@@ -213,5 +213,27 @@
     <script src="js/graph.js"></script>
     <script src="js/industry-structure.js"></script>
     <script src="js/app.js"></script>
+    
+    <!-- Application Initialization -->
+    <script>
+        // Initialize the economics simulator
+        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                // Create the economic model with all nodes and edges
+                const model = new EconomicModel();
+                
+                // Create the simulation engine with the model
+                const simulation = new EconomicSimulation(model);
+                
+                // Create and start the application
+                const app = new EconomicsApp(model, simulation);
+                
+                console.log('Economics Simulator initialized successfully');
+            } catch (error) {
+                console.error('Failed to initialize Economics Simulator:', error);
+                alert('Error initializing simulator: ' + error.message);
+            }
+        });
+    </script>
 </body>
 </html>
