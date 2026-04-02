@@ -32,6 +32,7 @@ class CausalGraph {
         this.edges = [];
         this.activePath = [];
         this.pulseAnimation = null;
+        this.xrayMode = false;
         
         this.init();
     }
@@ -91,6 +92,13 @@ class CausalGraph {
         feMerge.append('feMergeNode').attr('in', 'coloredBlur');
         feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
         
+        // X-Ray ghost filter for unseen effects
+        defs.append('filter')
+            .attr('id', 'xray-ghost')
+            .append('feColorMatrix')
+            .attr('type', 'matrix')
+            .attr('values', '0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0.3 0');
+        
         this.render();
     }
     
@@ -142,6 +150,21 @@ class CausalGraph {
                     .attr('stroke-width', 0)
                     .attr('stroke-opacity', 0)
                     .style('filter', 'url(#cantillon-glow)');
+                
+                // X-Ray ghost edge for unseen effects
+                if (d.to === 'total_dwl' || d.to === 'lobbying_effort') {
+                    edgeGroup.append('line')
+                        .attr('class', 'edge-xray')
+                        .attr('x1', fromNode.x)
+                        .attr('y1', fromNode.y)
+                        .attr('x2', toNode.x)
+                        .attr('y2', toNode.y)
+                        .attr('stroke', this.colors['rent-seeking'])
+                        .attr('stroke-width', 3)
+                        .attr('stroke-dasharray', '5,5')
+                        .attr('stroke-opacity', 0)
+                        .style('filter', 'url(#xray-ghost)');
+                }
             });
         
         // Create node group
@@ -272,6 +295,23 @@ class CausalGraph {
                     .attr('stroke-opacity', 0);
             }
         });
+    }
+    
+    toggleXRayMode(enabled) {
+        this.xrayMode = enabled;
+        
+        // Show/hide X-Ray ghost edges
+        d3.selectAll('.edge-xray').attr('stroke-opacity', enabled ? 0.6 : 0);
+        
+        // Highlight deadweight loss node in X-Ray mode
+        const dwlNode = this.nodes.filter(n => n.id === 'total_dwl')[0];
+        if (dwlNode) {
+            d3.selectAll('.node').filter(n => n.id === 'total_dwl')
+                .select('.node-circle')
+                .attr('stroke', enabled ? '#f59e0b' : '#1a1a2e')
+                .attr('stroke-width', enabled ? 4 : 2)
+                .style('filter', enabled && dwlNode.value > 0 ? 'url(#cantillon-glow)' : null);
+        }
     }
     
     triggerPulseAnimation(path) {
