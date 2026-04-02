@@ -65,100 +65,102 @@ header .subtitle {
     background: #764ba2;
 }
 
-/* Summary Strip */
-.summary-strip {
-    background: rgba(34, 197, 94, 0.1);
-    border-bottom: 1px solid rgba(34, 197, 94, 0.3);
-    padding: 1rem 2rem;
-}
-
-.summary-strip.hidden {
-    display: none;
-}
-
-.summary-strip h4 {
-    color: #4ade80;
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    margin-bottom: 0.25rem;
-}
-
-.summary-strip p {
-    color: #e2e8f0;
-    font-size: 0.95rem;
-    line-height: 1.5;
-}
-
-/* Chain Strip - shows active causal path */
-.chain-strip {
-    background: rgba(102, 126, 234, 0.1);
-    border-bottom: 1px solid rgba(102, 126, 234, 0.3);
-    padding: 0.75rem 2rem;
-    font-size: 0.85rem;
-}
-
-.chain-strip.hidden {
-    display: none;
-}
-
-#chain-label {
-    color: #667eea;
-    font-weight: bold;
-    margin-right: 0.5rem;
-}
-
-#chain-path {
-    color: #e2e8f0;
-}
-
-/* Teaching Mode Toggle */
-.teaching-mode-toggle {
-    background: rgba(0, 0, 0, 0.2);
+/* Bastiat Toggle (X-Ray Vision) */
+.bastiat-toggle {
+    background: rgba(0, 0, 0, 0.3);
     border-bottom: 1px solid #333;
-    padding: 0.65rem 2rem;
+    padding: 0.75rem 2rem;
     display: flex;
+    justify-content: center;
     align-items: center;
-    gap: 0.75rem;
+    gap: 1rem;
 }
 
-.teaching-mode-toggle label {
+.toggle-label {
     font-size: 0.85rem;
-    color: #e2e8f0;
-    cursor: pointer;
-}
-
-.teaching-mode-toggle input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-    accent-color: #667eea;
-    cursor: pointer;
-}
-
-.mode-description {
-    font-size: 0.8rem;
     color: #888;
+    transition: all 0.3s ease;
 }
 
-/* Callout Bubble */
-#callout-bubble {
-    position: fixed;
-    background: rgba(26, 33, 62, 0.95);
-    border: 1px solid #667eea;
-    border-radius: 8px;
-    padding: 0.65rem 1rem;
-    font-size: 0.85rem;
-    color: #e2e8f0;
-    z-index: 1000;
-    pointer-events: none;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    max-width: 250px;
+.toggle-label.xray-active {
+    color: #f59e0b;
+    text-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
 }
 
-#callout-bubble.hidden {
-    display: none;
+/* Switch component */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 60px;
+    height: 30px;
 }
 
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #333;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 22px;
+    width: 22px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background: linear-gradient(90deg, #f59e0b, #d97706);
+}
+
+input:checked + .slider:before {
+    transform: translateX(30px);
+}
+
+/* X-Ray Mode Styles */
+body.xray-mode .hidden-cost {
+    opacity: 1 !important;
+    animation: xray-pulse 2s ease-in-out infinite;
+}
+
+@keyframes xray-pulse {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; box-shadow: 0 0 20px rgba(245, 158, 11, 0.3); }
+}
+
+body.xray-mode .seen-only {
+    opacity: 0.3;
+    filter: grayscale(0.8);
+}
+
+/* Invisible Graveyard visualization */
+.invisible-graveyard {
+    border-left: 3px solid #f59e0b;
+    background: rgba(245, 158, 11, 0.05);
+}
+
+body.xray-mode .invisible-graveyard {
+    background: rgba(245, 158, 11, 0.15);
+    box-shadow: 0 0 30px rgba(245, 158, 11, 0.2);
+}
+
+/* App Layout - Temporal Cascade */
 #app {
     display: grid;
     grid-template-columns: 300px 1fr 320px;
@@ -167,7 +169,7 @@ header .subtitle {
     min-height: calc(100vh - 250px);
 }
 
-aside {
+.column {
     background: #16213e;
     border-radius: 12px;
     padding: 1.25rem;
@@ -176,12 +178,32 @@ aside {
     top: 1rem;
 }
 
+/* Column-specific styling for visual hierarchy */
+.column.lever {
+    border-top: 3px solid #ef4444; /* Red - intervention */
+}
+
+.column.transmission {
+    border-top: 3px solid #3b82f6; /* Blue - transmission */
+}
+
+.column.fallout {
+    border-top: 3px solid #10b981; /* Green - outcomes */
+}
+
 aside h2 {
     font-size: 1rem;
     margin-bottom: 1rem;
     color: #667eea;
     text-transform: uppercase;
     letter-spacing: 1px;
+}
+
+.column-description {
+    font-size: 0.8rem;
+    color: #666;
+    margin-bottom: 1rem;
+    font-style: italic;
 }
 
 /* Legend */
@@ -215,24 +237,15 @@ aside h2 {
     margin-right: 0.5rem;
 }
 
+/* Node type colors - neutral for causal, green/red only for welfare */
 .legend-color.policy { background: #ef4444; }
 .legend-color.market { background: #3b82f6; }
 .legend-color.quantity { background: #60a5fa; }
 .legend-color.welfare { background: #10b981; }
 .legend-color.rent-seeking { background: #f59e0b; }
+.legend-color.political { background: #f97316; }
 
-.legend-ring {
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    margin-right: 0.5rem;
-    border: 3px solid;
-}
-
-.legend-ring.up { border-color: #22c55e; }
-.legend-ring.down { border-color: #ef4444; }
-
-/* Legend edge indicators */
+/* Edge indicators - neutral colors (blue/orange), not moral (green/red) */
 .legend-edge {
     width: 20px;
     height: 3px;
@@ -251,14 +264,15 @@ aside h2 {
     border-bottom: 4px solid transparent;
 }
 
+/* Blue = direct relationship, Orange = inverse (NEUTRAL - no moral signaling) */
 .legend-edge.positive {
-    background: #22c55e;
-    color: #22c55e;
+    background: #60a5fa;
+    color: #60a5fa;
 }
 
 .legend-edge.negative {
-    background: #ef4444;
-    color: #ef4444;
+    background: #fb923c;
+    color: #fb923c;
 }
 
 .legend-divider {
@@ -367,6 +381,20 @@ aside h2 {
     color: #e2e8f0;
 }
 
+/* Hidden costs - only visible in X-Ray mode */
+.tradeoff-item.hidden-cost {
+    opacity: 0.3;
+    transition: all 0.3s ease;
+}
+
+body.xray-mode .tradeoff-item.hidden-cost {
+    opacity: 1;
+    background: rgba(245, 158, 11, 0.1);
+    margin: 0 -0.5rem;
+    padding: 0.5rem 0.5rem;
+    border-radius: 6px;
+}
+
 .tradeoff-item.hidden-cost .tradeoff-value {
     color: #f59e0b;
 }
@@ -415,13 +443,14 @@ aside h2 {
 }
 
 .group-value.positive {
-    color: #4ade80;
+    color: #4ade80; /* Green - welfare gain */
 }
 
 .group-value.negative {
-    color: #ef4444;
+    color: #ef4444; /* Red - welfare loss */
 }
 
+/* Main transmission column */
 main {
     background: #16213e;
     border-radius: 12px;
@@ -452,6 +481,10 @@ main {
 #graph-container {
     width: 100%;
     height: 420px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
 }
 
 /* Graph Elements */
@@ -461,7 +494,7 @@ main {
 }
 
 .node:hover .node-circle {
-    filter: drop-shadow(0 0 6px currentColor);
+    filter: drop-shadow(0 0 8px currentColor);
 }
 
 .node-label,
@@ -469,7 +502,12 @@ main {
     pointer-events: none;
 }
 
-/* Industry Panel */
+/* Edge pulse animation */
+.edge-base {
+    transition: stroke-opacity 0.1s ease;
+}
+
+/* Industry Panel - Cantillon Effect visualization */
 #industry-panel {
     background: rgba(0, 0, 0, 0.2);
     border-radius: 8px;
@@ -503,96 +541,115 @@ main {
     min-width: 120px;
 }
 
-/* Industry Metrics */
-#industry-metrics {
+/* Delta Metrics Cards */
+#delta-metrics {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
     gap: 0.75rem;
 }
 
-.mini-metric {
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: 6px;
-    padding: 0.65rem;
+#delta-metrics h3 {
+    font-size: 0.85rem;
+    color: #667eea;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 0.75rem;
 }
 
-.mini-label {
-    display: block;
-    font-size: 0.7rem;
-    color: #888;
-    margin-bottom: 0.4rem;
-}
-
-.mini-bar-container {
-    width: 100%;
-    height: 5px;
-    background: #333;
-    border-radius: 3px;
-    overflow: hidden;
-    margin-bottom: 0.2rem;
-}
-
-.mini-bar {
-    height: 100%;
-    background: #667eea;
-    transition: width 0.5s ease;
-    border-radius: 3px;
-}
-
-.mini-bar.warning {
-    background: linear-gradient(90deg, #ffa502, #ff7b00);
-}
-
-.mini-bar.positive {
-    background: linear-gradient(90deg, #4ade80, #22c55e);
-}
-
-.mini-value {
-    display: block;
-    font-size: 0.75rem;
-    font-weight: bold;
-    color: #fff;
-    text-align: right;
-}
-
-/* Metrics Panel */
-.metric-card {
+.delta-card {
     background: rgba(255, 255, 255, 0.05);
     border-radius: 8px;
-    padding: 0.75rem;
-    margin-bottom: 0.65rem;
+    padding: 0.85rem;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    gap: 0.25rem;
     transition: all 0.3s ease;
 }
 
-.metric-card:hover {
-    background: rgba(255, 255, 255, 0.1);
+.delta-card:hover {
+    background: rgba(255, 255, 255, 0.08);
     transform: translateX(3px);
 }
 
-.metric-card .label {
-    font-size: 0.8rem;
-    color: #aaa;
+.delta-label {
+    font-size: 0.7rem;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
-.metric-card .value {
+.delta-value {
+    font-size: 1.1rem;
     font-weight: bold;
-    font-size: 0.95rem;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
-.metric-card.rent-seeking {
+.delta-context {
+    font-size: 0.7rem;
+    color: #666;
+    margin-top: 0.25rem;
+}
+
+/* Special styling for key metrics */
+.rent-created {
     border-left: 3px solid #f59e0b;
-    background: rgba(245, 158, 11, 0.1);
+    background: rgba(245, 158, 11, 0.08);
 }
 
-.metric-card.negative {
-    border-left: 3px solid #ef4444;
+.lobbying-cost {
+    border-left: 3px solid #f97316;
+    background: rgba(249, 115, 22, 0.08);
 }
 
-.metric-card.negative .value {
-    color: #ef4444;
+.invisible-graveyard {
+    border-left: 3px solid #f59e0b;
+    background: rgba(245, 158, 11, 0.05);
+}
+
+body.xray-mode .invisible-graveyard {
+    background: rgba(245, 158, 11, 0.2);
+    box-shadow: 0 0 25px rgba(245, 158, 11, 0.3);
+    animation: graveyard-pulse 3s ease-in-out infinite;
+}
+
+@keyframes graveyard-pulse {
+    0%, 100% { box-shadow: 0 0 25px rgba(245, 158, 11, 0.3); }
+    50% { box-shadow: 0 0 40px rgba(245, 158, 11, 0.5); }
+}
+
+/* Delta indicator arrows */
+.delta-up {
+    color: #ef4444; /* Red for price increases - inflationary */
+}
+
+.delta-down {
+    color: #22c55e; /* Green for price decreases - deflationary benefit */
+}
+
+/* Chain Strip - active causal path display */
+.chain-strip {
+    background: rgba(102, 126, 234, 0.1);
+    border-left: 3px solid #667eea;
+    padding: 0.75rem 1rem;
+    font-size: 0.8rem;
+    margin-bottom: 1rem;
+    border-radius: 0 6px 6px 0;
+}
+
+.chain-strip.hidden {
+    display: none;
+}
+
+#chain-label {
+    color: #667eea;
+    font-weight: bold;
+    margin-right: 0.5rem;
+}
+
+#chain-path {
+    color: #e2e8f0;
 }
 
 /* Info Panel */
@@ -646,6 +703,25 @@ main {
     background: #444;
 }
 
+/* Callout Bubble */
+#callout-bubble {
+    position: fixed;
+    background: rgba(26, 33, 62, 0.95);
+    border: 1px solid #667eea;
+    border-radius: 8px;
+    padding: 0.65rem 1rem;
+    font-size: 0.85rem;
+    color: #e2e8f0;
+    z-index: 1000;
+    pointer-events: none;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    max-width: 250px;
+}
+
+#callout-bubble.hidden {
+    display: none;
+}
+
 footer {
     text-align: center;
     padding: 1.5rem;
@@ -660,7 +736,7 @@ footer {
         grid-template-columns: 1fr;
     }
     
-    aside {
+    aside, main {
         position: static;
     }
 }
