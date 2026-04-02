@@ -8,9 +8,11 @@ class EconomicsApp {
         
         // Initialize components
         this.graph = new CausalGraph('graph-container', model);
-        // FIX: Properly initialize industry structure with correct dimensions
+        
+        // CRITICAL FIX #1: Properly initialize industry structure with init() call
         const container = document.getElementById('industry-container');
         this.industryStructure = new IndustryStructure('industry-container', container.clientWidth, container.clientHeight || 300);
+        this.industryStructure.init();  // ← Was missing! Creates SVG and initial render
         
         // Bind UI elements
         this.bindControls();
@@ -127,11 +129,12 @@ class EconomicsApp {
     }
     
     getCausalPathForPolicy(policyType) {
-        // Define the primary causal chain for each policy
+        // CRITICAL FIX #3: Use correct node IDs that exist in the model
         const paths = {
             'tariff': ['tariff', 'import_price', 'domestic_price', 'consumer_demand', 'consumer_surplus', 'total_dwl'],
             'subsidy': ['subsidy', 'producer_price', 'domestic_supply', 'economic_rent', 'lobbying_effort', 'political_influence'],
-            'lobbying': ['lobbying_intensity', 'political_influence', 'tariff', 'import_price', 'consumer_surplus']
+            // Changed from 'lobbying_intensity' (doesn't exist) to 'lobbying_effort' (exists)
+            'lobbying': ['lobbying_effort', 'political_influence', 'tariff', 'import_price', 'consumer_surplus']
         };
         return paths[policyType] || [];
     }
@@ -159,12 +162,22 @@ class EconomicsApp {
         this.updateDeltaMetrics();
         this.updateTradeoffSnapshot();
         this.updateGroupImpacts();
-        this.graph.updateCantillonEffect();
-        this.graph.updateDeltaBadges();
-        // FIX: Pass results to industry structure render method
-        if (results && results.moat_pressure !== undefined) {
-            this.industryStructure.render(results.moat_pressure);
-            this.industryStructure.updateMetrics(results);
+        
+        // FAIL-SOFT GUARD: One bad subpanel shouldn't kill the whole app
+        try {
+            this.graph.updateCantillonEffect();
+            this.graph.updateDeltaBadges();
+        } catch (e) {
+            console.error('Graph update failed:', e);
+        }
+        
+        try {
+            if (results && results.moat_pressure !== undefined) {
+                this.industryStructure.render(results.moat_pressure);
+                this.industryStructure.updateMetrics(results);
+            }
+        } catch (e) {
+            console.error('Industry panel update failed:', e);
         }
     }
     
@@ -320,7 +333,9 @@ class EconomicsApp {
         const incumbentImpact = (nodes.find(n => n.id === 'producer_surplus')?.change || 0) + 
                                 (nodes.find(n => n.id === 'economic_rent')?.change || 0);
         
-        const entrantImpact = -(nodes.find(n => n.id === 'political_influence')?.value || 50 - 50) * 2;
+        // CRITICAL FIX #4: Entrant impact should be neutral at baseline (PI=50)
+        const influence = nodes.find(n => n.id === 'political_influence')?.value ?? 50;
+        const entrantImpact = -((influence - 50) * 2);  // At PI=50 → impact=0 ✓
         
         // Update displays
         this.updateGroupDisplay('household-impact', householdImpact, 'Households');
