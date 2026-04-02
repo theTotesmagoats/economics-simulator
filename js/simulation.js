@@ -21,6 +21,19 @@ class EconomicSimulation {
         };
     }
     
+    run() {
+        // Read current policy values from the model
+        const tariffNode = this.model.getNode('tariff');
+        const subsidyNode = this.model.getNode('subsidy');
+        const lobbyingNode = this.model.getNode('lobbying_intensity');
+        
+        const tariffRate = tariffNode ? tariffNode.value : 0;
+        const subsidyLevel = subsidyNode ? subsidyNode.value : 0;
+        const lobbyingIntensity = lobbyingNode ? lobbyingNode.value : 5;
+        
+        return this.runSimulation(tariffRate, subsidyLevel, lobbyingIntensity);
+    }
+    
     runSimulation(tariffRate, subsidyLevel, lobbyingIntensity) {
         const results = {};
         const params = this.parameters;
