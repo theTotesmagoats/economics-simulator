@@ -1,5 +1,311 @@
 // Graph Visualization with Cantillon Heatmap & Pulse Animation
-// Force-directed layout with neutral path colors, welfare-reserved green/red\n\nclass CausalGraph {\n    constructor(containerId, model) {\n        this.container = document.getElementById(containerId);\n        this.model = model;\n        this.width = this.container.clientWidth;\n        this.height = this.container.clientHeight;\n        \n        // Neutral path colors - blue/orange for causal direction\n        // Green/red reserved strictly for welfare gain/loss\n        this.colors = {\n            policy: '#ef4444',      // Red - intervention source\n            market: '#3b82f6',      // Blue - price signals  \n            quantity: '#60a5fa',    // Light blue - quantities\n            welfare: '#10b981',     // Green - ONLY for positive welfare\n            'rent-seeking': '#f59e0b', // Orange - rent creation\n            political: '#f97316',   // Dark orange - political feedback\n            \n            // Edge colors - neutral, no moral signaling\n            edgePositive: '#60a5fa',  // Blue arrow - direct relationship\n            edgeNegative: '#fb923c',  // Orange arrow - inverse relationship\n            \n            // Welfare-specific (ONLY for surplus/loss)\n            welfareGain: '#22c55e',   // Green - ONLY welfare gain\n            welfareLoss: '#ef4444'    // Red - ONLY welfare loss/deadweight\n        };\n        \n        this.svg = null;\n        this.nodes = new Map();\n        this.edges = [];\n        this.activePath = [];\n        this.pulseAnimation = null;\n        this.xrayMode = false;\n        this.nodeElements = null;  // Store references for highlighting\n        \n        this.init();\n    }\n    \n    init() {\n        // Clear container\n        this.container.innerHTML = '';\n        \n        // Create SVG with proper viewBox\n        this.svg = d3.select(this.container)\n            .append('svg')\n            .attr('width', '100%')\n            .attr('height', '100%')\n            .attr('viewBox', `0 0 ${this.width} ${this.height}`);\n        \n        // Define markers for arrowheads\n        const defs = this.svg.append('defs');\n        \n        // Blue arrowhead (direct relationship)\n        defs.append('marker')\n            .attr('id', 'arrow-positive')\n            .attr('viewBox', '0 -5 10 10')\n            .attr('refX', 8)\n            .attr('refY', 0)\n            .attr('markerWidth', 6)\n            .attr('markerHeight', 6)\n            .attr('orient', 'auto')\n            .append('path')\n            .attr('d', 'M0,-5L10,0L0,5')\n            .attr('fill', this.colors.edgePositive);\n        \n        // Orange arrowhead (inverse relationship)\n        defs.append('marker')\n            .attr('id', 'arrow-negative')\n            .attr('viewBox', '0 -5 10 10')\n            .attr('refX', 8)\n            .attr('refY', 0)\n            .attr('markerWidth', 6)\n            .attr('markerHeight', 6)\n            .attr('orient', 'auto')\n            .append('path')\n            .attr('d', 'M0,-5L10,0L0,5')\n            .attr('fill', this.colors.edgeNegative);\n        \n        // Glow filter for Cantillon effect\n        defs.append('filter')\n            .attr('id', 'cantillon-glow')\n            .attr('x', '-50%')\n            .attr('y', '-50%')\n            .attr('width', '200%')\n            .attr('height', '200%')\n            .append('feGaussianBlur')\n            .attr('stdDeviation', '3')\n            .attr('result', 'coloredBlur');\n        \n        const feMerge = defs.append('feMerge');\n        feMerge.append('feMergeNode').attr('in', 'coloredBlur');\n        feMerge.append('feMergeNode').attr('in', 'SourceGraphic');\n        \n        // X-Ray ghost filter for unseen effects\n        defs.append('filter')\n            .attr('id', 'xray-ghost')\n            .append('feColorMatrix')\n            .attr('type', 'matrix')\n            .attr('values', '0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0.3 0');\n        \n        this.render();\n    }\n    \n    render() {\n        const nodes = this.model.getAllNodes();\n        const edges = this.model.edges;\n        \n        // Calculate positions using fixed column layout with force-directed refinement\n        const nodePositions = this.calculatePositions(nodes);\n        \n        // Store positions on nodes\n        nodes.forEach(node => {\n            node.x = nodePositions[node.id].x;\n            node.y = nodePositions[node.id].y;\n        });\n        \n        // Create edge group (rendered first so edges are behind nodes)\n        const edgeGroup = this.svg.append('g').attr('class', 'edges');\n        \n        // Render edges with Cantillon heatmap overlay\n        this.edges = edgeGroup.selectAll('.edge')\n            .data(edges, d => `${d.from}-${d.to}`)\n            .enter().append('g')\n            .attr('class', 'edge-group')\n            .each(d => {\n                const fromNode = nodes.find(n => n.id === d.from);\n                const toNode = nodes.find(n => n.id === d.to);\n                \n                // Base edge\n                edgeGroup.append('line')\n                    .attr('class', 'edge-base')\n                    .attr('x1', fromNode.x)\n                    .attr('y1', fromNode.y)\n                    .attr('x2', toNode.x)\n                    .attr('y2', toNode.y)\n                    .attr('stroke', d.strength >= 0 ? this.colors.edgePositive : this.colors.edgeNegative)\n                    .attr('stroke-width', 1.5)\n                    .attr('stroke-opacity', 0.3)\n                    .attr('marker-end', `url(#arrow${d.strength >= 0 ? '-positive' : '-negative'})`);\n                \n                // Cantillon heatmap overlay - thickens based on lobbying intensity\n                edgeGroup.append('line')\n                    .attr('class', 'edge-cantillon')\n                    .attr('x1', fromNode.x)\n                    .attr('y1', fromNode.y)\n                    .attr('x2', toNode.x)\n                    .attr('y2', toNode.y)\n                    .attr('stroke', this.colors['rent-seeking'])\n                    .attr('stroke-width', 0)\n                    .attr('stroke-opacity', 0)\n                    .style('filter', 'url(#cantillon-glow)');\n                \n                // X-Ray ghost edge for unseen effects\n                if (d.to === 'total_dwl' || d.to === 'lobbying_effort') {\n                    edgeGroup.append('line')\n                        .attr('class', 'edge-xray')\n                        .attr('x1', fromNode.x)\n                        .attr('y1', fromNode.y)\n                        .attr('x2', toNode.x)\n                        .attr('y2', toNode.y)\n                        .attr('stroke', this.colors['rent-seeking'])\n                        .attr('stroke-width', 3)\n                        .attr('stroke-dasharray', '5,5')\n                        .attr('stroke-opacity', 0)\n                        .style('filter', 'url(#xray-ghost)');\n                }\n            });\n        \n        // Create node group with data-id attributes for highlighting\n        const nodeGroup = this.svg.append('g').attr('class', 'nodes');\n        \n        this.nodeElements = nodeGroup.selectAll('.node')\n            .data(nodes, d => d.id)\n            .enter().append('g')\n            .attr('class', d => `node node-${d.type}`)  // Add type class for targeting\n            .attr('data-id', d => d.id)  // FIX: Add data-id attribute for highlighting\n            .attr('transform', d => `translate(${d.x},${d.y})`)\n            .on('click', (event, d) => this.onNodeClick(event, d))\n            .each(function(d) {\n                const nodeEl = d3.select(this);\n                \n                // Node circle with size variation for Cantillon effect\n                nodeEl.append('circle')\n                    .attr('class', 'node-circle')\n                    .attr('r', 16)\n                    .attr('fill', d.type === 'welfare' && d.id.includes('surplus') ? \n                        this.colors.welfareGain : \n                        d.type === 'welfare' && d.id.includes('dwl') ?\n                        this.colors.welfareLoss :\n                        this.colors[d.type] || '#888')\n                    .attr('stroke', '#1a1a2e')\n                    .attr('stroke-width', 2)\n                    .style('filter', null);\n                \n                // Node label\n                nodeEl.append('text')\n                    .attr('class', 'node-label')\n                    .attr('y', 35)\n                    .attr('text-anchor', 'middle')\n                    .attr('fill', '#e2e8f0')\n                    .attr('font-size', '10px')\n                    .attr('font-weight', '500')\n                    .text(d.name);\n                \n                // Delta badge (appears when value changes)\n                nodeEl.append('text')\n                    .attr('class', 'delta-badge')\n                    .attr('y', -22)\n                    .attr('text-anchor', 'middle')\n                    .attr('fill', '#fff')\n                    .attr('font-size', '9px')\n                    .attr('font-weight', 'bold')\n                    .style('display', 'none');\n            });\n        \n        // Apply initial Cantillon effect\n        this.updateCantillonEffect();\n    }\n    \n    calculatePositions(nodes) {\n        const positions = {};\n        const columnWidth = this.width / 6; // 6 columns max\n        const marginX = 40;\n        const marginY = 30;\n        \n        // Group nodes by column\n        const columns = {};\n        nodes.forEach(node => {\n            const col = node.column || 0;\n            if (!columns[col]) columns[col] = [];\n            columns[col].push(node);\n        });\n        \n        // Sort column keys\n        const sortedCols = Object.keys(columns).sort((a, b) => a - b);\n        \n        // Calculate positions with high repulsion for clarity\n        sortedCols.forEach(col => {\n            const colNodes = columns[col];\n            const colX = marginX + (parseInt(col) + 0.5) * columnWidth;\n            const availableHeight = this.height - 2 * marginY;\n            const nodeSpacing = availableHeight / (colNodes.length + 1);\n            \n            colNodes.forEach((node, idx) => {\n                positions[node.id] = {\n                    x: colX,\n                    y: marginY + (idx + 1) * nodeSpacing\n                };\n            });\n        });\n        \n        return positions;\n    }\n    \n    updateCantillonEffect() {\n        const lobbyingNode = this.model.getNode('lobbying_intensity') || \n                            this.model.getNode('lobbying_effort');\n        const lobbyingValue = lobbyingNode ? lobbyingNode.value : 5;\n        const lobbyingNormalized = Math.min(lobbyingValue / 10, 1); // 0 to 1\n        \n        // Define center nodes (benefit from protection) vs periphery (starve)\n        const centerNodes = ['producer_surplus', 'economic_rent', 'gov_revenue', 'political_influence'];\n        const peripheryNodes = ['consumer_surplus', 'total_dwl', 'imports', 'consumer_demand'];\n        \n        // Update node sizes and opacity\n        this.nodeElements.each(function(node) {  // Use stored reference for proper selection\n            const el = d3.select(this);\n            const circle = el.select('.node-circle');\n            \n            if (centerNodes.includes(node.id)) {\n                // Center nodes grow with lobbying\n                const sizeMultiplier = 1 + lobbyingNormalized * 0.4;\n                circle.attr('r', 16 * sizeMultiplier)\n                      .style('filter', lobbyingNormalized > 0.3 ? 'url(#cantillon-glow)' : null);\n            } else if (peripheryNodes.includes(node.id)) {\n                // Periphery nodes fade/starve with lobbying\n                const opacity = 1 - lobbyingNormalized * 0.5;\n                circle.attr('r', Math.max(10, 16 * (1 - lobbyingNormalized * 0.2)))\n                      .attr('opacity', opacity);\n            }\n        });\n        \n        // Update edge thickness for Cantillon effect\n        // Edges connecting to center nodes thicken with lobbying\n        d3.selectAll('.edge-cantillon').each(function(edge) {\n            const isCenterEdge = centerNodes.includes(edge.to) || centerNodes.includes(edge.from);\n            if (isCenterEdge) {\n                const thickness = lobbyingNormalized * 4;\n                d3.select(this)\n                    .attr('stroke-width', thickness)\n                    .attr('stroke-opacity', Math.min(lobbyingNormalized, 0.8));\n            } else {\n                d3.select(this)\n                    .attr('stroke-width', 0)\n                    .attr('stroke-opacity', 0);\n            }\n        });\n    }\n    \n    highlightNode(nodeId, duration = 500) {  // FIX: New method for node highlighting\n        const targetNode = this.nodeElements.filter(d => d.id === nodeId);\n        if (targetNode.empty()) return;\n        \n        const circle = targetNode.select('.node-circle');\n        const originalStrokeWidth = circle.attr('stroke-width') || 2;\n        const originalRadius = circle.attr('r') || 16;
+// Force-directed layout with neutral path colors, welfare-reserved green/red
+
+class CausalGraph {
+    constructor(containerId, model) {
+        this.container = document.getElementById(containerId);
+        this.model = model;
+        this.width = this.container.clientWidth;
+        this.height = this.container.clientHeight;
+        
+        // Neutral path colors - blue/orange for causal direction
+        // Green/red reserved strictly for welfare gain/loss
+        this.colors = {
+            policy: '#ef4444',      // Red - intervention source
+            market: '#3b82f6',      // Blue - price signals  
+            quantity: '#60a5fa',    // Light blue - quantities
+            welfare: '#10b981',     // Green - ONLY for positive welfare
+            'rent-seeking': '#f59e0b', // Orange - rent creation
+            political: '#f97316',   // Dark orange - political feedback
+            
+            // Edge colors - neutral, no moral signaling
+            edgePositive: '#60a5fa',  // Blue arrow - direct relationship
+            edgeNegative: '#fb923c',  // Orange arrow - inverse relationship
+            
+            // Welfare-specific (ONLY for surplus/loss)
+            welfareGain: '#22c55e',   // Green - ONLY welfare gain
+            welfareLoss: '#ef4444'    // Red - ONLY welfare loss/deadweight
+        };
+        
+        this.svg = null;
+        this.nodes = new Map();
+        this.edges = [];
+        this.activePath = [];
+        this.pulseAnimation = null;
+        this.xrayMode = false;
+        this.nodeElements = null;  // Store references for highlighting
+        
+        this.init();
+    }
+    
+    init() {
+        // Clear container
+        this.container.innerHTML = '';
+        
+        // Create SVG with proper viewBox
+        this.svg = d3.select(this.container)
+            .append('svg')
+            .attr('width', '100%')
+            .attr('height', '100%')
+            .attr('viewBox', `0 0 ${this.width} ${this.height}`);
+        
+        // Define markers for arrowheads
+        const defs = this.svg.append('defs');
+        
+        // Blue arrowhead (direct relationship)
+        defs.append('marker')
+            .attr('id', 'arrow-positive')
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', 8)
+            .attr('refY', 0)
+            .attr('markerWidth', 6)
+            .attr('markerHeight', 6)
+            .attr('orient', 'auto')
+            .append('path')
+            .attr('d', 'M0,-5L10,0L0,5')
+            .attr('fill', this.colors.edgePositive);
+        
+        // Orange arrowhead (inverse relationship)
+        defs.append('marker')
+            .attr('id', 'arrow-negative')
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', 8)
+            .attr('refY', 0)
+            .attr('markerWidth', 6)
+            .attr('markerHeight', 6)
+            .attr('orient', 'auto')
+            .append('path')
+            .attr('d', 'M0,-5L10,0L0,5')
+            .attr('fill', this.colors.edgeNegative);
+        
+        // Glow filter for Cantillon effect
+        defs.append('filter')
+            .attr('id', 'cantillon-glow')
+            .attr('x', '-50%')
+            .attr('y', '-50%')
+            .attr('width', '200%')
+            .attr('height', '200%')
+            .append('feGaussianBlur')
+            .attr('stdDeviation', '3')
+            .attr('result', 'coloredBlur');
+        
+        const feMerge = defs.append('feMerge');
+        feMerge.append('feMergeNode').attr('in', 'coloredBlur');
+        feMerge.append('feMergeNode').attr('in', 'SourceGraphic');
+        
+        // X-Ray ghost filter for unseen effects
+        defs.append('filter')
+            .attr('id', 'xray-ghost')
+            .append('feColorMatrix')
+            .attr('type', 'matrix')
+            .attr('values', '0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0.3 0');
+        
+        this.render();
+    }
+    
+    render() {
+        const nodes = this.model.getAllNodes();
+        const edges = this.model.edges;
+        
+        // Calculate positions using fixed column layout with force-directed refinement
+        const nodePositions = this.calculatePositions(nodes);
+        
+        // Store positions on nodes
+        nodes.forEach(node => {
+            node.x = nodePositions[node.id].x;
+            node.y = nodePositions[node.id].y;
+        });
+        
+        // Create edge group (rendered first so edges are behind nodes)
+        const edgeGroup = this.svg.append('g').attr('class', 'edges');
+        
+        // Render edges with Cantillon heatmap overlay
+        this.edges = edgeGroup.selectAll('.edge')
+            .data(edges, d => `${d.from}-${d.to}`)
+            .enter().append('g')
+            .attr('class', 'edge-group')
+            .each(d => {
+                const fromNode = nodes.find(n => n.id === d.from);
+                const toNode = nodes.find(n => n.id === d.to);
+                
+                // Base edge
+                edgeGroup.append('line')
+                    .attr('class', 'edge-base')
+                    .attr('x1', fromNode.x)
+                    .attr('y1', fromNode.y)
+                    .attr('x2', toNode.x)
+                    .attr('y2', toNode.y)
+                    .attr('stroke', d.strength >= 0 ? this.colors.edgePositive : this.colors.edgeNegative)
+                    .attr('stroke-width', 1.5)
+                    .attr('stroke-opacity', 0.3)
+                    .attr('marker-end', `url(#arrow${d.strength >= 0 ? '-positive' : '-negative'})`);
+                
+                // Cantillon heatmap overlay - thickens based on lobbying intensity
+                edgeGroup.append('line')
+                    .attr('class', 'edge-cantillon')
+                    .attr('x1', fromNode.x)
+                    .attr('y1', fromNode.y)
+                    .attr('x2', toNode.x)
+                    .attr('y2', toNode.y)
+                    .attr('stroke', this.colors['rent-seeking'])
+                    .attr('stroke-width', 0)
+                    .attr('stroke-opacity', 0)
+                    .style('filter', 'url(#cantillon-glow)');
+                
+                // X-Ray ghost edge for unseen effects
+                if (d.to === 'total_dwl' || d.to === 'lobbying_effort') {
+                    edgeGroup.append('line')
+                        .attr('class', 'edge-xray')
+                        .attr('x1', fromNode.x)
+                        .attr('y1', fromNode.y)
+                        .attr('x2', toNode.x)
+                        .attr('y2', toNode.y)
+                        .attr('stroke', this.colors['rent-seeking'])
+                        .attr('stroke-width', 3)
+                        .attr('stroke-dasharray', '5,5')
+                        .attr('stroke-opacity', 0)
+                        .style('filter', 'url(#xray-ghost)');
+                }
+            });
+        
+        // Create node group with data-id attributes for highlighting
+        const nodeGroup = this.svg.append('g').attr('class', 'nodes');
+        
+        this.nodeElements = nodeGroup.selectAll('.node')
+            .data(nodes, d => d.id)
+            .enter().append('g')
+            .attr('class', d => `node node-${d.type}`)  // Add type class for targeting
+            .attr('data-id', d => d.id)  // FIX: Add data-id attribute for highlighting
+            .attr('transform', d => `translate(${d.x},${d.y})`)
+            .on('click', (event, d) => this.onNodeClick(event, d))
+            .each(function(d) {
+                const nodeEl = d3.select(this);
+                
+                // Node circle with size variation for Cantillon effect
+                nodeEl.append('circle')
+                    .attr('class', 'node-circle')
+                    .attr('r', 16)
+                    .attr('fill', d.type === 'welfare' && d.id.includes('surplus') ? 
+                        this.colors.welfareGain : 
+                        d.type === 'welfare' && d.id.includes('dwl') ?
+                        this.colors.welfareLoss :
+                        this.colors[d.type] || '#888')
+                    .attr('stroke', '#1a1a2e')
+                    .attr('stroke-width', 2)
+                    .style('filter', null);
+                
+                // Node label
+                nodeEl.append('text')
+                    .attr('class', 'node-label')
+                    .attr('y', 35)
+                    .attr('text-anchor', 'middle')
+                    .attr('fill', '#e2e8f0')
+                    .attr('font-size', '10px')
+                    .attr('font-weight', '500')
+                    .text(d.name);
+                
+                // Delta badge (appears when value changes)
+                nodeEl.append('text')
+                    .attr('class', 'delta-badge')
+                    .attr('y', -22)
+                    .attr('text-anchor', 'middle')
+                    .attr('fill', '#fff')
+                    .attr('font-size', '9px')
+                    .attr('font-weight', 'bold')
+                    .style('display', 'none');
+            });
+        
+        // Apply initial Cantillon effect
+        this.updateCantillonEffect();
+    }
+    
+    calculatePositions(nodes) {
+        const positions = {};
+        const columnWidth = this.width / 6; // 6 columns max
+        const marginX = 40;
+        const marginY = 30;
+        
+        // Group nodes by column
+        const columns = {};
+        nodes.forEach(node => {
+            const col = node.column || 0;
+            if (!columns[col]) columns[col] = [];
+            columns[col].push(node);
+        });
+        
+        // Sort column keys
+        const sortedCols = Object.keys(columns).sort((a, b) => a - b);
+        
+        // Calculate positions with high repulsion for clarity
+        sortedCols.forEach(col => {
+            const colNodes = columns[col];
+            const colX = marginX + (parseInt(col) + 0.5) * columnWidth;
+            const availableHeight = this.height - 2 * marginY;
+            const nodeSpacing = availableHeight / (colNodes.length + 1);
+            
+            colNodes.forEach((node, idx) => {
+                positions[node.id] = {
+                    x: colX,
+                    y: marginY + (idx + 1) * nodeSpacing
+                };
+            });
+        });
+        
+        return positions;
+    }
+    
+    updateCantillonEffect() {
+        const lobbyingNode = this.model.getNode('lobbying_intensity') || 
+                            this.model.getNode('lobbying_effort');
+        const lobbyingValue = lobbyingNode ? lobbyingNode.value : 5;
+        const lobbyingNormalized = Math.min(lobbyingValue / 10, 1); // 0 to 1
+        
+        // Define center nodes (benefit from protection) vs periphery (starve)
+        const centerNodes = ['producer_surplus', 'economic_rent', 'gov_revenue', 'political_influence'];
+        const peripheryNodes = ['consumer_surplus', 'total_dwl', 'imports', 'consumer_demand'];
+        
+        // Update node sizes and opacity
+        this.nodeElements.each(function(node) {  // Use stored reference for proper selection
+            const el = d3.select(this);
+            const circle = el.select('.node-circle');
+            
+            if (centerNodes.includes(node.id)) {
+                // Center nodes grow with lobbying
+                const sizeMultiplier = 1 + lobbyingNormalized * 0.4;
+                circle.attr('r', 16 * sizeMultiplier)
+                      .style('filter', lobbyingNormalized > 0.3 ? 'url(#cantillon-glow)' : null);
+            } else if (peripheryNodes.includes(node.id)) {
+                // Periphery nodes fade/starve with lobbying
+                const opacity = 1 - lobbyingNormalized * 0.5;
+                circle.attr('r', Math.max(10, 16 * (1 - lobbyingNormalized * 0.2)))
+                      .attr('opacity', opacity);
+            }
+        });
+        
+        // Update edge thickness for Cantillon effect
+        // Edges connecting to center nodes thicken with lobbying
+        d3.selectAll('.edge-cantillon').each(function(edge) {
+            const isCenterEdge = centerNodes.includes(edge.to) || centerNodes.includes(edge.from);
+            if (isCenterEdge) {
+                const thickness = lobbyingNormalized * 4;
+                d3.select(this)
+                    .attr('stroke-width', thickness)
+                    .attr('stroke-opacity', Math.min(lobbyingNormalized, 0.8));
+            } else {
+                d3.select(this)
+                    .attr('stroke-width', 0)
+                    .attr('stroke-opacity', 0);
+            }
+        });
+    }
+    
+    highlightNode(nodeId, duration = 500) {  // FIX: New method for node highlighting
+        const targetNode = this.nodeElements.filter(d => d.id === nodeId);
+        if (targetNode.empty()) return;
+        
+        const circle = targetNode.select('.node-circle');
+        const originalStrokeWidth = circle.attr('stroke-width') || 2;
+        const originalRadius = circle.attr('r') || 16;
     
         // Pulse effect with glow
         circle.transition()
@@ -19,23 +325,94 @@
             });
     }
     
-    toggleXRayMode(enabled) {\n        this.xrayMode = enabled;\n        \n        // Show/hide X-Ray ghost edges\n        d3.selectAll('.edge-xray').attr('stroke-opacity', enabled ? 0.6 : 0);\n        \n        // Highlight deadweight loss node in X-Ray mode\n        const dwlNode = this.nodeElements.filter(d => d.id === 'total_dwl')[0];\n        if (dwlNode) {\n            this.nodeElements.filter(d => d.id === 'total_dwl')\n                .select('.node-circle')\n                .attr('stroke', enabled ? '#f59e0b' : '#1a1a2e')\n                .attr('stroke-width', enabled ? 4 : 2)\n                .style('filter', enabled && dwlNode.value > 0 ? 'url(#cantillon-glow)' : null);
+    toggleXRayMode(enabled) {
+        this.xrayMode = enabled;
+        
+        // Show/hide X-Ray ghost edges
+        d3.selectAll('.edge-xray').attr('stroke-opacity', enabled ? 0.6 : 0);
+        
+        // Highlight deadweight loss node in X-Ray mode
+        const dwlNode = this.nodeElements.filter(d => d.id === 'total_dwl')[0];
+        if (dwlNode) {
+            this.nodeElements.filter(d => d.id === 'total_dwl')
+                .select('.node-circle')
+                .attr('stroke', enabled ? '#f59e0b' : '#1a1a2e')
+                .attr('stroke-width', enabled ? 4 : 2)
+                .style('filter', enabled && dwlNode.value > 0 ? 'url(#cantillon-glow)' : null);
         }
-    }\n    \n    triggerPulseAnimation(path) {\n        // Clear any existing animation\n        if (this.pulseAnimation) {\n            clearTimeout(this.pulseAnimation);\n        }\n        \n        this.activePath = path;\n        \n        // Animate pulse along the path, highlighting nodes as we go
+    }
+    
+    triggerPulseAnimation(path) {
+        // Clear any existing animation
+        if (this.pulseAnimation) {
+            clearTimeout(this.pulseAnimation);
+        }
+        
+        this.activePath = path;
+        
+        // Animate pulse along the path, highlighting nodes as we go
         let step = 0;
         const totalSteps = path.length * 4;  // More frames for smoother animation
-        \n        const animateStep = () => {\n            if (step >= totalSteps) {\n                this.resetPulse();\n                return;\n            }\n            \n            const edgeIndex = Math.floor(step / 4);
-            if (edgeIndex < path.length - 1) {\n                // Highlight current edge in pulse
-                d3.selectAll('.edge-base')\n                    .transition()\n                    .duration(100)\n                    .attr('stroke-opacity', (d, i) => {\n                        const from = d.from;\n                        const to = d.to;\n                        const isCurrentEdge = edgeIndex < path.length - 1 && \n                            path[edgeIndex] === from && path[edgeIndex + 1] === to;\n                        return isCurrentEdge ? 1 : 0.3;\n                    });
+        
+        const animateStep = () => {
+            if (step >= totalSteps) {
+                this.resetPulse();
+                return;
+            }
+            
+            const edgeIndex = Math.floor(step / 4);
+            if (edgeIndex < path.length - 1) {
+                // Highlight current edge in pulse
+                d3.selectAll('.edge-base')
+                    .transition()
+                    .duration(100)
+                    .attr('stroke-opacity', (d, i) => {
+                        const from = d.from;
+                        const to = d.to;
+                        const isCurrentEdge = edgeIndex < path.length - 1 && 
+                            path[edgeIndex] === from && path[edgeIndex + 1] === to;
+                        return isCurrentEdge ? 1 : 0.3;
+                    });
                 
                 // Highlight the target node of this edge
                 if (path[edgeIndex + 1]) {
                     this.highlightNode(path[edgeIndex + 1], 800);
                 }
-            }\n            \n            step++;
+            }
+            
+            step++;
             this.pulseAnimation = setTimeout(animateStep, 50);
-        };\n        \n        animateStep();\n    }\n    \n    resetPulse() {\n        d3.selectAll('.edge-base')\n            .attr('stroke-opacity', 0.3);\n        this.activePath = [];
-    }\n    \n    onNodeClick(event, node) {\n        // Dispatch custom event for info panel
+        };
+        
+        animateStep();
+    }
+    
+    resetPulse() {
+        d3.selectAll('.edge-base')
+            .attr('stroke-opacity', 0.3);
+        this.activePath = [];
+    }
+    
+    onNodeClick(event, node) {
+        // Dispatch custom event for info panel
         window.dispatchEvent(new CustomEvent('nodeInfo', { detail: node }));
-    }\n    \n    updateDeltaBadges() {\n        this.nodeElements.each(function(node) {  // Use stored reference
-            const badge = d3.select(this).select('.delta-badge');\n            const change = node.change || 0;\n            \n            if (Math.abs(change) > 0.1) {\n                const sign = change > 0 ? '▲' : '▼';\n                const value = Math.abs(change).toFixed(1);\n                badge.text(`${sign}${value}`)\n                    .style('display', 'block')\n                    .attr('fill', node.type === 'welfare' ? \n                        (change > 0 ? this.colors.welfareGain : this.colors.welfareLoss) : '#fff');\n            } else {\n                badge.style('display', 'none');\n            }\n        }, this);\n    }\n}\n
+    }
+    
+    updateDeltaBadges() {
+        this.nodeElements.each(function(node) {  // Use stored reference
+            const badge = d3.select(this).select('.delta-badge');
+            const change = node.change || 0;
+            
+            if (Math.abs(change) > 0.1) {
+                const sign = change > 0 ? '▲' : '▼';
+                const value = Math.abs(change).toFixed(1);
+                badge.text(`${sign}${value}`)
+                    .style('display', 'block')
+                    .attr('fill', node.type === 'welfare' ? 
+                        (change > 0 ? this.colors.welfareGain : this.colors.welfareLoss) : '#fff');
+            } else {
+                badge.style('display', 'none');
+            }
+        }, this);
+    }
+}
