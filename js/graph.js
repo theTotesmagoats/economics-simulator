@@ -171,25 +171,34 @@ class CausalGraph {
         // Create node group with data-id attributes for highlighting
         const nodeGroup = this.svg.append('g').attr('class', 'nodes');
         
+        // CRITICAL FIX: Capture `this` reference before .each() to preserve scope
+        const self = this;
+        
         this.nodeElements = nodeGroup.selectAll('.node')
             .data(nodes, d => d.id)
             .enter().append('g')
             .attr('class', d => `node node-${d.type}`)  // Add type class for targeting
             .attr('data-id', d => d.id)  // FIX: Add data-id attribute for highlighting
             .attr('transform', d => `translate(${d.x},${d.y})`)
-            .on('click', (event, d) => this.onNodeClick(event, d))
+            .on('click', (event, d) => self.onNodeClick(event, d))
             .each(function(d) {
                 const nodeEl = d3.select(this);
+                
+                // Determine fill color based on node type
+                let fillColor;
+                if (d.type === 'welfare' && d.id.includes('surplus')) {
+                    fillColor = self.colors.welfareGain;
+                } else if (d.type === 'welfare' && d.id.includes('dwl')) {
+                    fillColor = self.colors.welfareLoss;
+                } else {
+                    fillColor = self.colors[d.type] || '#888';
+                }
                 
                 // Node circle with size variation for Cantillon effect
                 nodeEl.append('circle')
                     .attr('class', 'node-circle')
                     .attr('r', 16)
-                    .attr('fill', d.type === 'welfare' && d.id.includes('surplus') ? 
-                        this.colors.welfareGain : 
-                        d.type === 'welfare' && d.id.includes('dwl') ?
-                        this.colors.welfareLoss :
-                        this.colors[d.type] || '#888')
+                    .attr('fill', fillColor)
                     .attr('stroke', '#1a1a2e')
                     .attr('stroke-width', 2)
                     .style('filter', null);
