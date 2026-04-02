@@ -1,24 +1,68 @@
 // Chicago School Economic Simulation Engine
 // Implements supply/demand, welfare analysis, and rent-seeking dynamics
+// 
+// ECONOMIC FOUNDATIONS:
+// - Demand: Qd = demandIntercept - demandSlope × P
+// - Supply: Qs = supplyIntercept + supplySlope × P  (supplyIntercept is negative)
+// - Autarky equilibrium where Qd = Qs
+// - World price exogenous; country is importer if worldPrice < autarkyPrice
 
 class EconomicSimulation {
     constructor(model) {
         this.model = model;
         this.parameters = {
-            // Demand: Qd = a - b*P
+            // Demand: Qd = 200 - P (downward sloping)
             demandIntercept: 200,
             demandSlope: 1,
             
-            // Supply: Qs = c + d*P  
-            supplyIntercept: -50,
+            // Supply: Qs = -50 + P, or equivalently P = 50 + Q (upward sloping)
+            supplyIntercept: -50,  // Negative because supply starts at P > 0
             supplySlope: 1,
             
-            // World price (exogenous)
-            worldPrice: 100,
+            // World price (exogenous) - set BELOW autarky to make us an importer
+            worldPrice: 100,  // At P=$100: Qd=100, Qs=50 → imports of 50 units
             
             // Rent-seeking parameters
             rentSeekingEfficiency: 0.4,  // What fraction of rents is spent on lobbying
         };
+    }
+    
+    /**
+     * Calculate autarky (closed economy) equilibrium price and quantity
+     * Where Qd = Qs: demandIntercept - b×P = c + d×P
+     * Solving: P = (demandIntercept - supplyIntercept) / (demandSlope + supplySlope)
+     */
+    getAutarkyEquilibrium() {
+        const params = this.parameters;
+        const autarkyPrice = (params.demandIntercept - params.supplyIntercept) / 
+                             (params.demandSlope + params.supplySlope);
+        const autarkyQuantity = params.demandIntercept - params.demandSlope * autarkyPrice;
+        return { price: autarkyPrice, quantity: autarkyQuantity };
+    }
+    
+    /**
+     * Calculate producer surplus at a given price
+     * PS = area above supply curve and below price line
+     * For linear supply Qs = c + d×P (or P = -c/d + Q/d):
+     * PS = 0.5 × (P - P_min)² / slope, where P_min is choke price (-supplyIntercept/supplySlope)
+     */
+    calculateProducerSurplus(price) {
+        const params = this.parameters;
+        const supplyChokePrice = -params.supplyIntercept / params.supplySlope;  // = $50
+        const effectivePriceAboveChoke = Math.max(0, price - supplyChokePrice);
+        return 0.5 * Math.pow(effectivePriceAboveChoke, 2) / params.supplySlope;
+    }
+    
+    /**
+     * Calculate consumer surplus at a given price
+     * CS = area below demand curve and above price line
+     * For linear demand Qd = a - b×P:
+     * CS = 0.5 × (demandIntercept - P)² / slope
+     */
+    calculateConsumerSurplus(price) {
+        const params = this.parameters;
+        const effectiveDemandRange = Math.max(0, params.demandIntercept - price);
+        return 0.5 * Math.pow(effectiveDemandRange, 2) / params.demandSlope;
     }
     
     run() {
@@ -38,35 +82,51 @@ class EconomicSimulation {
         const results = {};
         const params = this.parameters;
         
-        // Free trade equilibrium (for comparison)
-        const freeTradePrice = (params.demandIntercept - params.supplyIntercept) / 
-                               (params.demandSlope + params.supplySlope);
-        const freeTradeQuantity = params.demandIntercept - params.demandSlope * freeTradePrice;
+        // ========== EQUILIBRIUM CALCULATIONS ==========
         
-        // Step 1: Calculate prices
+        // Autarky equilibrium (closed economy reference point)
+        const autarky = this.getAutarkyEquilibrium();
+        results.autarky_price = autarky.price;  // $125
+        results.autarky_quantity = autarky.quantity;  // 75 units
+        
+        // Free trade quantities at world price (reference point)
+        const freeTradeDemand = params.demandIntercept - params.demandSlope * params.worldPrice;
+        const freeTradeSupply = params.supplyIntercept + params.supplySlope * params.worldPrice;
+        results.free_trade_demand = freeTradeDemand;  // 100 units
+        results.free_trade_supply = freeTradeSupply;  // 50 units
+        results.free_trade_imports = Math.max(0, freeTradeDemand - freeTradeSupply);  // 50 units
+        
+        // Step 1: Calculate prices with tariff
         const importPriceWithTariff = params.worldPrice * (1 + tariffRate / 100);
         
         results.world_price = params.worldPrice;
         results.import_price = importPriceWithTariff;
         
-        if (importPriceWithTariff <= freeTradePrice) {
-            // Tariff not prohibitive - imports still happen
+        // CRITICAL FIX #2: Price ceiling logic
+        // Domestic price cannot exceed autarky price - if tariff makes imports too expensive,
+        // consumers switch to domestic goods and market clears at autarky equilibrium
+        // This is min(), not max() - the autarky price is a CEILING, not a floor
+        if (importPriceWithTariff < autarky.price) {
+            // Tariff non-prohibitive: imports still viable, domestic price = import price
             results.domestic_price = importPriceWithTariff;
             results.producer_price = importPriceWithTariff + subsidyLevel;
+            results.is_prohibitive_tariff = false;
         } else {
-            // Prohibitive tariff - autarky
-            results.domestic_price = freeTradePrice;
-            results.producer_price = freeTradePrice + subsidyLevel;
+            // Prohibitive tariff: imports eliminated, market clears at autarky
+            results.domestic_price = autarky.price;  // CEILING - consumers won't pay more!
+            results.producer_price = autarky.price + subsidyLevel;
+            results.is_prohibitive_tariff = true;
         }
         
-        // Step 2: Calculate quantities
+        // Step 2: Calculate quantities at equilibrium prices
         const consumerDemand = Math.max(0, params.demandIntercept - params.demandSlope * results.domestic_price);
         const domesticSupply = Math.max(0, params.supplyIntercept + params.supplySlope * results.producer_price);
         
-        if (results.domestic_price === importPriceWithTariff && importPriceWithTariff <= freeTradePrice) {
+        // Imports only if tariff is non-prohibitive
+        if (!results.is_prohibitive_tariff) {
             results.imports = Math.max(0, consumerDemand - domesticSupply);
         } else {
-            results.imports = 0;
+            results.imports = 0;  // Autarky - no imports
         }
         
         results.consumer_demand = consumerDemand;
@@ -80,20 +140,41 @@ class EconomicSimulation {
         results.subsidy_cost = subsidyCost;
         results.net_gov_budget = govRevenue - subsidyCost;
         
-        // Step 4: Welfare analysis
-        const consumerSurplus = 0.5 * Math.pow(Math.max(0, params.demandIntercept - results.domestic_price), 2) / params.demandSlope;
+        // Step 4: Welfare analysis using CORRECT geometric formulas
+        const consumerSurplus = this.calculateConsumerSurplus(results.domestic_price);
         const producerPriceWithoutSubsidy = results.producer_price - subsidyLevel;
-        const producerSurplus = 0.5 * Math.pow(Math.max(0, producerPriceWithoutSubsidy - (-params.supplyIntercept / params.supplySlope)), 2) / params.supplySlope;
+        const producerSurplus = this.calculateProducerSurplus(producerPriceWithoutSubsidy);
         
         results.consumer_surplus = consumerSurplus;
         results.producer_surplus = producerSurplus;
         
-        // Step 5: Economic rents created
-        const priceAboveFreeTrade = Math.max(0, results.domestic_price - freeTradePrice);
-        const rentFromTariff = priceAboveFreeTrade * domesticSupply;
-        const rentFromSubsidy = subsidyLevel * domesticSupply;
+        // Step 5: ECONOMIC RENT CALCULATION - CRITICAL FIX #3
+        // Economic rent is the ARTIFICIAL profit created by protectionism
+        // It equals the CHANGE in producer surplus due to policy intervention
+        // NOT a crude rectangle that ignores supply curve geometry
         
-        results.economic_rent = rentFromTariff + rentFromSubsidy;
+        // Baseline producer surplus at free trade (world price, no subsidy)
+        const baselineProducerSurplus = this.calculateProducerSurplus(params.worldPrice);
+        
+        // Producer surplus with protection (domestic price + any subsidy benefit)
+        // Note: subsidies directly increase PS dollar-for-dollar
+        const protectedProducerSurplus = producerSurplus + (subsidyLevel * domesticSupply);
+        
+        // Economic rent = artificial profit created by policy
+        // This is the TRUE change in PS, accounting for supply curve geometry
+        results.economic_rent = Math.max(0, protectedProducerSurplus - baselineProducerSurplus);
+        
+        // Breakdown for transparency:
+        // Rectangle component: price increase × baseline quantity (pure rent)
+        const priceIncrease = Math.max(0, results.domestic_price - params.worldPrice);
+        results.rent_rectangle = priceIncrease * freeTradeSupply;
+        
+        // Triangle component: half of new production surplus (partially offset by costs)
+        const additionalProduction = Math.max(0, domesticSupply - freeTradeSupply);
+        results.rent_triangle = 0.5 * priceIncrease * additionalProduction;
+        
+        // Subsidy rent: direct transfer to producers
+        results.subsidy_rent = subsidyLevel * domesticSupply;
         
         // Step 6: Rent-seeking behavior
         const lobbyingMultiplier = lobbyingIntensity / 5;
@@ -102,17 +183,33 @@ class EconomicSimulation {
         results.lobbying_effort = lobbyingEffort;
         results.rent_seeking_loss = lobbyingEffort;
         
-        // Step 7: Deadweight loss
-        const productionDWL = 0.5 * (results.producer_price - params.worldPrice) * 
-                              Math.max(0, domesticSupply - (params.supplyIntercept + params.supplySlope * params.worldPrice));
-        const consumptionDWL = 0.5 * (results.domestic_price - params.worldPrice) * 
-                               Math.max(0, freeTradeQuantity - consumerDemand);
+        // Step 7: Deadweight loss - CORRECT calculation
+        // DWL has three components:
+        // 1. Production distortion: inefficient domestic production (triangle)
+        // 2. Consumption distortion: reduced consumption below efficient level (triangle)  
+        // 3. Rent-seeking waste: resources spent on lobbying (rectangle)
         
-        results.production_dwl = Math.max(0, productionDWL);
-        results.consumption_dwl = Math.max(0, consumptionDWL);
-        results.total_dwl = results.production_dwl + results.consumption_dwl + lobbyingEffort;
+        // Production DWL: area between supply curve and world price for excess production
+        const baselineSupplyAtWorldPrice = freeTradeSupply;
+        if (domesticSupply > baselineSupplyAtWorldPrice && !results.is_prohibitive_tariff) {
+            results.production_dwl = 0.5 * (results.producer_price - subsidyLevel - params.worldPrice) * 
+                                    (domesticSupply - baselineSupplyAtWorldPrice);
+        } else {
+            results.production_dwl = 0;
+        }
         
-        // Step 8: Political influence
+        // Consumption DWL: lost surplus from reduced consumption
+        if (consumerDemand < freeTradeDemand) {
+            results.consumption_dwl = 0.5 * (results.domestic_price - params.worldPrice) * 
+                                     (freeTradeDemand - consumerDemand);
+        } else {
+            results.consumption_dwl = 0;
+        }
+        
+        // Total DWL includes rent-seeking waste
+        results.total_dwl = Math.max(0, results.production_dwl) + Math.max(0, results.consumption_dwl) + lobbyingEffort;
+        
+        // Step 8: Political influence accumulation
         const influenceFromLobbying = lobbyingEffort / 15;
         results.political_influence = Math.min(100, Math.max(0, 50 + influenceFromLobbying * lobbyingMultiplier));
         
@@ -133,11 +230,9 @@ class EconomicSimulation {
         );
         
         // Concentration Index: 0 = perfectly competitive, 100 = monopoly
-        // Rises with moat pressure
         results.concentration_index = Math.round(results.moat_pressure * 100);
         
         // Small Business Survival Rate: percentage of small firms that survive
-        // Falls as moat pressure rises
         results.small_business_survival = Math.max(5, Math.round((1 - results.moat_pressure) * 95 + 5));
         
         // Entrant Viability: likelihood new entrants can succeed (0-100)
@@ -155,13 +250,13 @@ class EconomicSimulation {
         results.small_firms_surviving = Math.max(1, Math.round(baselineSmallFirms * (results.small_business_survival / 100)));
         
         // Incumbent market share advantage (percentage points above competitive level)
-        const baselineIncumbentShare = 20;  // Each incumbent has ~20% in free competition
         results.incumbent_share_advantage = Math.round(results.moat_pressure * 40);  // Up to +40%
         
         return results;
     }
     
     freeTradeEquilibriumPrice() {
+        // Legacy name - this actually returns AUTARKY price
         return (this.parameters.demandIntercept - this.parameters.supplyIntercept) / 
                (this.parameters.demandSlope + this.parameters.supplySlope);
     }
