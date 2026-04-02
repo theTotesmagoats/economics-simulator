@@ -36,8 +36,8 @@ The fixed left-to-right layout shows:
 - 🔴 Red ring = value decreased
 - 🟢 Green ring = value increased
 - Number above node = percentage change
-- **Green edges** = positive relationship (A↑ → B↑)
-- **Red edges** = negative relationship (A↑ → B↓)
+- **Blue edges** = positive relationship (A↑ → B↑)
+- **Orange edges** = negative relationship (A↑ → B↓)
 - Click any node for detailed explanation
 
 ### 3. Active Chain Strip
@@ -136,16 +136,23 @@ economics-simulator/
 **Supply/Demand:**
 - Demand: Qd = 200 - P
 - Supply: Qs = -50 + P
-- Free trade equilibrium: P* = $150, Q* = 50 units
+- **Autarky equilibrium**: P* = $125, Q* = 75 units (closed economy)
+- **World price**: P_w = $100 (exogenous, makes us an importer)
+
+**At World Price ($100):**
+- Domestic demand: Qd = 200 - 100 = 100 units
+- Domestic supply: Qs = -50 + 100 = 50 units
+- **Imports**: 100 - 50 = 50 units ✓ (we're an importer)
 
 **Tariff Effects:**
-- Import price = World Price × (1 + tariff/100)
-- Domestic price = max(import price, free trade price)
+- Import price with tariff = World Price × (1 + tariff/100)
+- Domestic price = min(import price, autarky price) ← **autarky is a CEILING, not floor**
 - Producer price = domestic price + subsidy
 
-**Rent Creation:**
-- Economic Rent = (Protected Price - Competitive Price) × Protected Quantity
-- This is the "prize" motivating rent-seeking
+**Rent Creation (CORRECTED):**
+- Economic Rent = Change in producer surplus due to policy
+- NOT a crude rectangle — properly accounts for supply curve geometry
+- Includes both tariff-induced rent AND subsidy transfers
 
 **Industry Structure Variables:**
 - `moatPressure` = f(economic_rent, lobbying_effort, political_influence, tariff)
